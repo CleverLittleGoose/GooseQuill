@@ -93,6 +93,7 @@ export function switchStudioView(viewName) {
   // 2. Toggle View Containers
   const views = {
     workspace: document.getElementById("viewWorkspace"),
+    studio: document.getElementById("viewStudio"),
     combiner: document.getElementById("viewCombiner"),
     batches: document.getElementById("viewBatches"),
     economics: document.getElementById("viewEconomics")
@@ -111,7 +112,9 @@ export function switchStudioView(viewName) {
   });
 
   // 3. Trigger view-specific refreshes
-  if (viewName === "combiner") {
+  if (viewName === "studio") {
+    eventBus.emit("studio:document:activated");
+  } else if (viewName === "combiner") {
     eventBus.emit("studio:combiner:activated");
   } else if (viewName === "batches") {
     eventBus.emit("studio:batches:activated");
