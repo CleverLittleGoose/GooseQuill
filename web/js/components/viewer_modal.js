@@ -1,6 +1,6 @@
 /**
  * GooseQuill - Document Viewer & Side-by-Side Comparison Modal Component
- * With Bi-Directional Auto-Scroll Page Reflection
+ * With Bi-Directional Auto-Scroll Page Reflection & In-Viewer Text Search
  */
 
 import { appState, eventBus } from "../state.js";
@@ -11,11 +11,22 @@ let autoSyncEnabled = true;
 let isProgrammaticScroll = false;
 let scrollTimeout = null;
 
+// Search State
+const searchState = {
+  isOpen: false,
+  query: "",
+  matchCase: false,
+  matches: [],
+  currentIndex: -1,
+  debounceTimer: null
+};
+
 export function initViewerModal() {
   const viewerModal = document.getElementById("viewerModal");
   const closeViewerBtn = document.getElementById("closeViewerBtn");
   const viewerTogglePdfBtn = document.getElementById("viewerTogglePdfBtn");
   const viewerAutoScrollBtn = document.getElementById("viewerAutoScrollBtn");
+  const viewerSearchToggleBtn = document.getElementById("viewerSearchToggleBtn");
   const viewerCopyBtn = document.getElementById("viewerCopyBtn");
   const viewerDownloadBtn = document.getElementById("viewerDownloadBtn");
   const pdfPrevPageBtn = document.getElementById("pdfPrevPageBtn");
@@ -23,8 +34,17 @@ export function initViewerModal() {
   const viewerPdfPane = document.getElementById("viewerPdfPane");
   const viewerMarkdownPane = document.getElementById("viewerMarkdownPane");
 
+  // Search UI Elements
+  const viewerSearchBar = document.getElementById("viewerSearchBar");
+  const viewerSearchInput = document.getElementById("viewerSearchInput");
+  const viewerSearchCaseBtn = document.getElementById("viewerSearchCaseBtn");
+  const viewerSearchPrevBtn = document.getElementById("viewerSearchPrevBtn");
+  const viewerSearchNextBtn = document.getElementById("viewerSearchNextBtn");
+  const viewerSearchCloseBtn = document.getElementById("viewerSearchCloseBtn");
+
   if (closeViewerBtn) {
     closeViewerBtn.addEventListener("click", () => {
+      closeSearchBar();
       if (viewerModal) viewerModal.style.display = "none";
     });
   }
@@ -35,6 +55,57 @@ export function initViewerModal() {
       autoSyncEnabled = !autoSyncEnabled;
       viewerAutoScrollBtn.classList.toggle("active", autoSyncEnabled);
       viewerAutoScrollBtn.textContent = autoSyncEnabled ? "⚡ Auto-Sync" : "⚡ Auto-Sync (Off)";
+    });
+  }
+
+  // Search Bar Toggle & Controls
+  if (viewerSearchToggleBtn) {
+    viewerSearchToggleBtn.addEventListener("click", () => {
+      if (searchState.isOpen) {
+        closeSearchBar();
+      } else {
+        openSearchBar();
+      }
+    });
+  }
+
+  if (viewerSearchCloseBtn) {
+    viewerSearchCloseBtn.addEventListener("click", () => closeSearchBar());
+  }
+
+  if (viewerSearchCaseBtn) {
+    viewerSearchCaseBtn.addEventListener("click", () => {
+      searchState.matchCase = !searchState.matchCase;
+      viewerSearchCaseBtn.classList.toggle("active", searchState.matchCase);
+      viewerSearchCaseBtn.setAttribute("aria-pressed", searchState.matchCase ? "true" : "false");
+      performSearch(viewerSearchInput?.value || "", searchState.matchCase);
+    });
+  }
+
+  if (viewerSearchNextBtn) {
+    viewerSearchNextBtn.addEventListener("click", () => navigateMatch(1));
+  }
+
+  if (viewerSearchPrevBtn) {
+    viewerSearchPrevBtn.addEventListener("click", () => navigateMatch(-1));
+  }
+
+  if (viewerSearchInput) {
+    viewerSearchInput.addEventListener("input", (e) => {
+      clearTimeout(searchState.debounceTimer);
+      searchState.debounceTimer = setTimeout(() => {
+        performSearch(e.target.value, searchState.matchCase);
+      }, 120);
+    });
+
+    viewerSearchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        navigateMatch(e.shiftKey ? -1 : 1);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        closeSearchBar();
+      }
     });
   }
 
@@ -89,15 +160,29 @@ export function initViewerModal() {
     });
   }
 
-  // Keyboard navigation for viewer modal (Arrow Left / Right / PageUp / PageDown / Esc)
+  // Keyboard navigation for viewer modal (Cmd+F / Arrow Left / Right / PageUp / PageDown / Esc)
   window.addEventListener("keydown", (e) => {
     if (viewerModal && viewerModal.style.display === "flex") {
-      if (e.key === "ArrowLeft" || e.key === "PageUp") {
-        goToPage(appState.currentPdfPage - 1, true);
-      } else if (e.key === "ArrowRight" || e.key === "PageDown") {
-        goToPage(appState.currentPdfPage + 1, true);
-      } else if (e.key === "Escape") {
-        viewerModal.style.display = "none";
+      // Cmd+F / Ctrl+F -> In-Viewer Text Search
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        openSearchBar();
+        return;
+      }
+
+      if (e.key === "Escape") {
+        if (searchState.isOpen) {
+          e.preventDefault();
+          closeSearchBar();
+        } else {
+          viewerModal.style.display = "none";
+        }
+      } else if (!searchState.isOpen || document.activeElement !== viewerSearchInput) {
+        if (e.key === "ArrowLeft" || e.key === "PageUp") {
+          goToPage(appState.currentPdfPage - 1, true);
+        } else if (e.key === "ArrowRight" || e.key === "PageDown") {
+          goToPage(appState.currentPdfPage + 1, true);
+        }
       }
     }
   });
@@ -122,6 +207,247 @@ export function initViewerModal() {
   }
 
   eventBus.on("modal:viewer:open", (doc) => openDocumentViewer(doc));
+}
+
+/**
+ * Open the in-viewer search toolbar and focus the input field
+ */
+export function openSearchBar() {
+  const viewerSearchBar = document.getElementById("viewerSearchBar");
+  const viewerSearchInput = document.getElementById("viewerSearchInput");
+  const viewerSearchToggleBtn = document.getElementById("viewerSearchToggleBtn");
+
+  searchState.isOpen = true;
+  if (viewerSearchBar) viewerSearchBar.style.display = "flex";
+  if (viewerSearchToggleBtn) viewerSearchToggleBtn.classList.add("active");
+
+  if (viewerSearchInput) {
+    viewerSearchInput.focus();
+    viewerSearchInput.select();
+    if (viewerSearchInput.value) {
+      performSearch(viewerSearchInput.value, searchState.matchCase);
+    }
+  }
+}
+
+/**
+ * Close search toolbar, clear matches, and return focus
+ */
+export function closeSearchBar() {
+  const viewerSearchBar = document.getElementById("viewerSearchBar");
+  const viewerSearchToggleBtn = document.getElementById("viewerSearchToggleBtn");
+  const viewerSearchCount = document.getElementById("viewerSearchCount");
+  const viewerSearchPrevBtn = document.getElementById("viewerSearchPrevBtn");
+  const viewerSearchNextBtn = document.getElementById("viewerSearchNextBtn");
+
+  searchState.isOpen = false;
+  searchState.query = "";
+  searchState.matches = [];
+  searchState.currentIndex = -1;
+
+  if (viewerSearchBar) viewerSearchBar.style.display = "none";
+  if (viewerSearchToggleBtn) viewerSearchToggleBtn.classList.remove("active");
+  if (viewerSearchCount) viewerSearchCount.textContent = "0/0";
+  if (viewerSearchPrevBtn) viewerSearchPrevBtn.disabled = true;
+  if (viewerSearchNextBtn) viewerSearchNextBtn.disabled = true;
+
+  clearSearchHighlights();
+}
+
+/**
+ * Cleanly remove all <mark> nodes and normalize DOM text
+ */
+function clearSearchHighlights() {
+  const container = document.getElementById("viewerMarkdownContent");
+  if (!container) return;
+
+  const marks = container.querySelectorAll("mark.viewer-search-match");
+  marks.forEach((mark) => {
+    const parent = mark.parentNode;
+    if (parent) {
+      parent.replaceChild(document.createTextNode(mark.textContent), mark);
+      parent.normalize();
+    }
+  });
+}
+
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Perform non-destructive text search across the rendered markdown container
+ */
+export function performSearch(query, matchCase = false) {
+  clearSearchHighlights();
+
+  const container = document.getElementById("viewerMarkdownContent");
+  const viewerSearchCount = document.getElementById("viewerSearchCount");
+  const viewerSearchPrevBtn = document.getElementById("viewerSearchPrevBtn");
+  const viewerSearchNextBtn = document.getElementById("viewerSearchNextBtn");
+
+  const trimmed = (query || "").trim();
+  searchState.query = trimmed;
+  searchState.matches = [];
+  searchState.currentIndex = -1;
+
+  if (!trimmed || !container) {
+    if (viewerSearchCount) viewerSearchCount.textContent = "0/0";
+    if (viewerSearchPrevBtn) viewerSearchPrevBtn.disabled = true;
+    if (viewerSearchNextBtn) viewerSearchNextBtn.disabled = true;
+    return;
+  }
+
+  // Walk all text nodes inside container
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_SKIP;
+      const parent = node.parentElement;
+      if (
+        parent &&
+        (parent.tagName === "SCRIPT" ||
+          parent.tagName === "STYLE" ||
+          parent.classList.contains("doc-page-badge") ||
+          parent.classList.contains("search-count"))
+      ) {
+        return NodeFilter.FILTER_REJECT;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+
+  const textNodes = [];
+  let currentNode;
+  while ((currentNode = walker.nextNode())) {
+    textNodes.push(currentNode);
+  }
+
+  const flags = matchCase ? "g" : "gi";
+  const regex = new RegExp(escapeRegExp(trimmed), flags);
+  const foundMatches = [];
+
+  textNodes.forEach((node) => {
+    const text = node.nodeValue;
+    if (!regex.test(text)) return;
+    regex.lastIndex = 0;
+
+    const fragment = document.createDocumentFragment();
+    let lastIdx = 0;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+      const matchStart = match.index;
+      const matchEnd = match.index + match[0].length;
+
+      if (matchStart > lastIdx) {
+        fragment.appendChild(document.createTextNode(text.substring(lastIdx, matchStart)));
+      }
+
+      const mark = document.createElement("mark");
+      mark.className = "viewer-search-match";
+      mark.textContent = match[0];
+      fragment.appendChild(mark);
+      foundMatches.push(mark);
+
+      lastIdx = matchEnd;
+    }
+
+    if (lastIdx < text.length) {
+      fragment.appendChild(document.createTextNode(text.substring(lastIdx)));
+    }
+
+    if (node.parentNode) {
+      node.parentNode.replaceChild(fragment, node);
+    }
+  });
+
+  searchState.matches = foundMatches;
+
+  if (foundMatches.length > 0) {
+    if (viewerSearchPrevBtn) viewerSearchPrevBtn.disabled = false;
+    if (viewerSearchNextBtn) viewerSearchNextBtn.disabled = false;
+    activateMatch(0, true);
+  } else {
+    if (viewerSearchCount) viewerSearchCount.textContent = "0 matches";
+    if (viewerSearchPrevBtn) viewerSearchPrevBtn.disabled = true;
+    if (viewerSearchNextBtn) viewerSearchNextBtn.disabled = true;
+  }
+}
+
+/**
+ * Navigate to next (+1) or previous (-1) match
+ */
+export function navigateMatch(direction = 1) {
+  if (searchState.matches.length === 0) return;
+  const count = searchState.matches.length;
+  const nextIdx = (searchState.currentIndex + direction + count) % count;
+  activateMatch(nextIdx, true);
+}
+
+/**
+ * Highlight the active match and synchronize both markdown and PDF preview panes
+ */
+function activateMatch(index, scrollToMatch = true) {
+  if (index < 0 || index >= searchState.matches.length) return;
+
+  // Clear previous active highlight
+  searchState.matches.forEach((m) => m.classList.remove("viewer-search-match-active"));
+
+  searchState.currentIndex = index;
+  const activeMark = searchState.matches[index];
+  activeMark.classList.add("viewer-search-match-active");
+
+  // Update live announcement counter
+  const viewerSearchCount = document.getElementById("viewerSearchCount");
+  if (viewerSearchCount) {
+    viewerSearchCount.textContent = `${index + 1} of ${searchState.matches.length}`;
+  }
+
+  // Detect which page section contains this match
+  const pageNum = detectMatchPageNumber(activeMark);
+  if (pageNum && pageNum !== appState.currentPdfPage && pageNum >= 1 && pageNum <= appState.totalPdfPages) {
+    appState.currentPdfPage = pageNum;
+    updatePdfPageView();
+  }
+
+  // Smooth scroll markdown pane to center the active match
+  if (scrollToMatch) {
+    isProgrammaticScroll = true;
+    activeMark.scrollIntoView({ behavior: "smooth", block: "center" });
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      isProgrammaticScroll = false;
+    }, 600);
+  }
+}
+
+/**
+ * Helper to determine which Page N section contains a match element
+ */
+function detectMatchPageNumber(element) {
+  const container = document.getElementById("viewerMarkdownContent");
+  if (!container || !element) return 1;
+
+  let current = element;
+  while (current && current !== container) {
+    if (current.dataset && current.dataset.page) {
+      return parseInt(current.dataset.page, 10);
+    }
+    // Check previous siblings
+    let prev = current.previousElementSibling;
+    while (prev) {
+      if (prev.dataset && prev.dataset.page) {
+        return parseInt(prev.dataset.page, 10);
+      }
+      const childPage = prev.querySelector("[data-page]");
+      if (childPage && childPage.dataset.page) {
+        return parseInt(childPage.dataset.page, 10);
+      }
+      prev = prev.previousElementSibling;
+    }
+    current = current.parentElement;
+  }
+  return 1;
 }
 
 /**
