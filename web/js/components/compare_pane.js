@@ -15,8 +15,8 @@
  * and opening a 200-page filing beside another stays cheap.
  */
 
-import { appState } from "../state.js";
 import { TranscriptView } from "../services/transcript_view.js";
+import { populateDocumentSelect, findDocumentByPath, resolvePdfPath } from "../services/document_catalog.js";
 
 export class ComparePane {
   /**
@@ -27,6 +27,7 @@ export class ComparePane {
     this.container = container;
     this.label = options.label || "B";
     this.onPageChange = options.onPageChange || (() => {});
+    this.onDocumentLoaded = options.onDocumentLoaded || (() => {});
 
     this.doc = null;
     this.pdfPath = null;
@@ -114,44 +115,13 @@ export class ComparePane {
     );
   }
 
-  /** Fill the picker from the converted documents already in workspace state. */
+  /** Fill the picker from the shared catalogue. */
   populateDocuments() {
-    const current = this.select.value;
-    const docs = [];
-
-    (appState.folders || []).forEach((folder) => {
-      (folder.documents || []).forEach((doc) => {
-        if (doc.is_converted) docs.push(doc);
-      });
-    });
-
-    docs.sort((a, b) => (a.folder || "").localeCompare(b.folder || "") || (a.name || "").localeCompare(b.name || ""));
-
-    const byFolder = new Map();
-    docs.forEach((doc) => {
-      if (!byFolder.has(doc.folder)) byFolder.set(doc.folder, []);
-      byFolder.get(doc.folder).push(doc);
-    });
-
-    this.select.innerHTML = '<option value="">Choose a converted document…</option>';
-    byFolder.forEach((folderDocs, folderName) => {
-      const group = document.createElement("optgroup");
-      group.label = folderName;
-      folderDocs.forEach((doc) => {
-        const option = document.createElement("option");
-        option.value = doc.path;
-        option.textContent = doc.name.replace(/\.pdf$/i, "");
-        group.appendChild(option);
-      });
-      this.select.appendChild(group);
-    });
-
-    if (current) this.select.value = current;
-    this.documents = docs;
+    this.documents = populateDocumentSelect(this.select);
   }
 
   _findDocByPath(path) {
-    return (this.documents || []).find((d) => d.path === path) || null;
+    return findDocumentByPath(path);
   }
 
   async loadDocument(doc) {
@@ -159,11 +129,7 @@ export class ComparePane {
     this.totalPages = doc.total_pages || 1;
     this.currentPage = 1;
 
-    let pdfPath = doc.path;
-    if (pdfPath && pdfPath.toLowerCase().endsWith(".md")) {
-      pdfPath = pdfPath.replace(/[/\\]Markdown[/\\]/, "/").replace(/\.md$/i, ".pdf");
-    }
-    this.pdfPath = pdfPath;
+    this.pdfPath = resolvePdfPath(doc);
 
     if (this.select.value !== doc.path) this.select.value = doc.path;
 
@@ -182,6 +148,7 @@ export class ComparePane {
     }
 
     this._refreshPdf();
+    this.onDocumentLoaded(doc);
   }
 
   setView(view) {

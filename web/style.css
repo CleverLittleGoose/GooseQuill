@@ -2281,15 +2281,23 @@ input[type="checkbox"]:focus-visible {
   gap: 14px;
 }
 
-.studio-doc-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-main);
-  margin: 0;
-  max-width: 440px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.studio-doc-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.studio-doc-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.studio-doc-picker .compare-doc-select {
+  min-width: 240px;
+  max-width: 420px;
+  font-weight: 600;
 }
 
 .studio-header-actions {
@@ -2683,4 +2691,71 @@ body.is-resizing-panes {
 body.is-resizing-panes iframe,
 body.is-resizing-panes .studio-pane {
   pointer-events: none;
+}
+
+/* Pane A's chip mirrors pane B's, so the two read as a matched pair. */
+.studio-doc-picker .compare-pane-label {
+  background: #0ea5e9;
+}
+
+/* ==========================================================================
+   Diff Mode
+   ========================================================================== */
+.diff-body {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.diff-unchanged {
+  opacity: 0.55;   /* unchanged pages recede so changed ones carry the eye */
+}
+
+.diff-missing {
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 10px 0;
+}
+
+.diff-del {
+  background-color: rgba(239, 68, 68, 0.22);
+  color: #fecaca;
+  text-decoration: line-through;
+  text-decoration-color: rgba(239, 68, 68, 0.65);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.diff-ins {
+  background-color: rgba(16, 185, 129, 0.22);
+  color: #bbf7d0;
+  text-decoration: none;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.diff-summary {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  padding: 0 6px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Page marker for pages rendered by something other than the markdown pipeline. */
+.tv-page-marker {
+  margin-bottom: 8px;
+}
+
+/* Icon-only toolbar buttons keep their tap target without spending the width. */
+.btn-icon-label {
+  min-width: 30px;
+  padding-left: 8px;
+  padding-right: 8px;
+  text-align: center;
 }

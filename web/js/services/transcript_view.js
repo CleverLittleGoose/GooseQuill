@@ -67,11 +67,14 @@ export class TranscriptView {
   /**
    * Swap in a document. `pagesMap` is {pageNumber: markdownForThatPage}.
    */
-  setDocument(pagesMap, { restrictToPage = null } = {}) {
+  setDocument(pagesMap, { restrictToPage = null, renderPage = null } = {}) {
     this._cancelIndexing();
     this.observer.disconnect();
 
     this.pagesMap = pagesMap || {};
+    // Lets a caller supply its own HTML per page — diff mode renders annotated
+    // pages this way and inherits the windowing for free.
+    this.renderPage = renderPage;
     this.pageNumbers = Object.keys(this.pagesMap)
       .filter((key) => /^\d+$/.test(key))   // skips the "preamble" entry
       .map((n) => parseInt(n, 10))
@@ -153,7 +156,7 @@ export class TranscriptView {
     const section = this.sections.get(page);
     if (!section) return;
 
-    section.innerHTML = markdownRenderer.render(this.pagesMap[page] || "");
+    section.innerHTML = this._renderPageHtml(page);
     this._decoratePageHeading(section, page);
     this.renderedPages.add(page);
 
@@ -170,6 +173,11 @@ export class TranscriptView {
       const hit = this.searchHits[this.currentHitIndex];
       if (hit && hit.page === page) this._highlightWithinSection(section, hit.ordinal);
     }
+  }
+
+  _renderPageHtml(page) {
+    if (this.renderPage) return this.renderPage(page, this.pagesMap[page] || "");
+    return markdownRenderer.render(this.pagesMap[page] || "");
   }
 
   _releasePage(page) {
@@ -194,7 +202,18 @@ export class TranscriptView {
   /** Give the page's own heading its badge, as the flat renderer used to. */
   _decoratePageHeading(section, page) {
     const heading = section.querySelector("h1, h2, h3, h4, h5, h6");
-    if (!heading || heading.querySelector(".doc-page-badge")) return;
+    if (!heading) {
+      // Custom-rendered pages (diff mode) carry no markdown heading, but the
+      // reader still needs to know which page they are looking at.
+      if (!section.querySelector(".doc-page-badge")) {
+        const standalone = document.createElement("div");
+        standalone.className = "doc-page-heading tv-page-marker";
+        standalone.innerHTML = `<span class="doc-page-badge">PAGE ${page}</span>`;
+        section.insertBefore(standalone, section.firstChild);
+      }
+      return;
+    }
+    if (heading.querySelector(".doc-page-badge")) return;
     heading.classList.add("doc-page-heading");
     const badge = document.createElement("span");
     badge.className = "doc-page-badge";
@@ -291,7 +310,7 @@ export class TranscriptView {
         (processed < MIN_PAGES_PER_SLICE || hasTime())
       ) {
         const page = queue.shift();
-        scratch.innerHTML = markdownRenderer.render(this.pagesMap[page] || "");
+        scratch.innerHTML = this._renderPageHtml(page);
         this.textIndex.set(page, scratch.textContent || "");
         processed++;
       }
@@ -325,7 +344,7 @@ export class TranscriptView {
 
     const scratch = document.createElement("div");
     for (const page of missing) {
-      scratch.innerHTML = markdownRenderer.render(this.pagesMap[page] || "");
+      scratch.innerHTML = this._renderPageHtml(page);
       this.textIndex.set(page, scratch.textContent || "");
     }
     scratch.innerHTML = "";

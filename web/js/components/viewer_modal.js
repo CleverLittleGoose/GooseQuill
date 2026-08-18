@@ -8,6 +8,8 @@ import { appState, eventBus } from "../state.js";
 import { showToast } from "../services/notifications.js";
 import { TranscriptView } from "../services/transcript_view.js";
 import { ComparePane } from "./compare_pane.js";
+import { populateDocumentSelect, findDocumentByPath, resolvePdfPath } from "../services/document_catalog.js";
+import { comparePageSets, diffPageHtml } from "../services/text_diff.js";
 import { switchStudioView } from "./header.js";
 
 let autoSyncEnabled = true;
@@ -32,6 +34,11 @@ function getActiveTranscript() {
 let comparePane = null;
 let compareEnabled = false;
 let linkPagesEnabled = true;
+let diffEnabled = false;
+let diffChangedPages = [];
+// Page pairs are diffed on demand and kept, so scrolling back over a page does
+// not pay for the comparison twice.
+const diffCache = new Map();
 
 // Viewer & Studio State
 let viewerFormat = "rendered"; // "rendered" | "raw"
@@ -249,12 +256,29 @@ export function initViewerModal() {
   if (viewerDownloadBtn) viewerDownloadBtn.addEventListener("click", handleDownload);
   if (studioDownloadBtn) studioDownloadBtn.addEventListener("click", handleDownload);
 
+  // Pane A document picker — symmetric with pane B's.
+  const studioDocSelect = document.getElementById("studioDocSelect");
+  if (studioDocSelect) {
+    studioDocSelect.addEventListener("change", () => {
+      const doc = findDocumentByPath(studioDocSelect.value);
+      if (doc) openDocumentInStudio(doc);
+    });
+  }
+
   initStudioSplitters();
 
   // PDF zoom
   document.querySelectorAll(".pdf-zoom-controls [data-zoom]").forEach((btn) => {
     btn.addEventListener("click", () => setZoom(btn.dataset.zoom));
   });
+
+  // Diff mode
+  const studioDiffBtn = document.getElementById("studioDiffBtn");
+  if (studioDiffBtn) studioDiffBtn.addEventListener("click", () => setDiffEnabled(!diffEnabled));
+  const studioDiffPrevBtn = document.getElementById("studioDiffPrevBtn");
+  const studioDiffNextBtn = document.getElementById("studioDiffNextBtn");
+  if (studioDiffPrevBtn) studioDiffPrevBtn.addEventListener("click", () => goToChangedPage(-1));
+  if (studioDiffNextBtn) studioDiffNextBtn.addEventListener("click", () => goToChangedPage(1));
 
   // Compare (second document)
   const studioCompareBtn = document.getElementById("studioCompareBtn");
@@ -690,10 +714,7 @@ export async function openDocumentViewer(doc) {
 }
 
 function setupDocState(doc) {
-  let pdfPath = doc.path;
-  if (pdfPath && pdfPath.toLowerCase().endsWith(".md")) {
-    pdfPath = pdfPath.replace(/[/\\]Markdown[/\\]/, "/").replace(/\.md$/i, ".pdf");
-  }
+  const pdfPath = resolvePdfPath(doc);
 
   appState.currentViewingDoc = doc;
   appState.currentViewingPdfPath = pdfPath;
@@ -705,13 +726,18 @@ function setupDocState(doc) {
   const metaText = `${doc.total_pages || 1} pages • ${(doc.file_size / 1024).toFixed(0)} KB • ${doc.folder}`;
   const vTitle = document.getElementById("viewerDocTitle");
   const vMeta = document.getElementById("viewerDocMeta");
-  const sTitle = document.getElementById("studioDocTitle");
   const sMeta = document.getElementById("studioDocMeta");
 
   if (vTitle) vTitle.textContent = doc.name;
   if (vMeta) vMeta.textContent = metaText;
-  if (sTitle) sTitle.textContent = doc.name;
   if (sMeta) sMeta.textContent = metaText;
+
+  // Pane A names itself through its picker, the same way pane B does.
+  const studioDocSelect = document.getElementById("studioDocSelect");
+  if (studioDocSelect) {
+    populateDocumentSelect(studioDocSelect, { placeholder: "Choose a document…" });
+    studioDocSelect.value = doc.path;
+  }
 }
 
 async function loadAndRenderDoc(doc) {
@@ -739,6 +765,9 @@ async function loadAndRenderDoc(doc) {
     renderStudioPageList();
     updateViewerDisplay();
     updateSaveButtonState();
+
+    diffCache.clear();
+    if (diffEnabled) setDiffEnabled(true);
   } catch (e) {
     const errHtml = `<div class="text-danger text-center" style="padding: 40px;">Error loading markdown: ${e.message}</div>`;
     if (viewerMarkdownContent) viewerMarkdownContent.innerHTML = errHtml;
@@ -802,6 +831,141 @@ export function updatePdfPageView() {
   if (studioPdfPrevPageBtn) studioPdfPrevPageBtn.disabled = isFirst;
   if (studioPdfNextPageBtn) studioPdfNextPageBtn.disabled = isLast;
   if (studioPdfPageImage && studioPdfPageImage.getAttribute("src") !== imgUrl) studioPdfPageImage.src = imgUrl;
+}
+
+/* ==========================================================================
+   DIFF MODE
+   ========================================================================== */
+
+/**
+ * Turn change highlighting on or off across both panes.
+ *
+ * Diff needs two documents, so it is only offered once Compare is on and pane B
+ * actually holds something.
+ */
+function setDiffEnabled(enabled) {
+  const diffBtn = document.getElementById("studioDiffBtn");
+  const summary = document.getElementById("studioDiffSummary");
+  const prevBtn = document.getElementById("studioDiffPrevBtn");
+  const nextBtn = document.getElementById("studioDiffNextBtn");
+
+  const canDiff = compareEnabled && comparePane && comparePane.doc;
+  diffEnabled = enabled && canDiff;
+  diffCache.clear();
+
+  if (diffBtn) diffBtn.classList.toggle("active", diffEnabled);
+  [summary, prevBtn, nextBtn].forEach((el) => {
+    if (el) el.style.display = diffEnabled ? "inline-flex" : "none";
+  });
+
+  if (!diffEnabled) {
+    diffChangedPages = [];
+    // Back to plain transcripts on both sides.
+    if (transcripts.studio) transcripts.studio.setDocument(pagesMap, { restrictToPage: null });
+    if (comparePane && comparePane.doc) {
+      comparePane.transcript.setDocument(comparePane.pagesMap, { restrictToPage: null });
+      comparePane.setView("transcript");
+    }
+    if (summary) summary.textContent = "";
+    return;
+  }
+
+  const pagesB = comparePane.pagesMap;
+  const comparison = comparePageSets(pagesMap, pagesB);
+  diffChangedPages = comparison.changedPages;
+
+  if (summary) {
+    const parts = [`${diffChangedPages.length}/${comparison.sharedPages.length} changed`];
+    if (comparison.onlyInA.length) parts.push(`${comparison.onlyInA.length} only A`);
+    if (comparison.onlyInB.length) parts.push(`${comparison.onlyInB.length} only B`);
+    summary.textContent = parts.join(" · ");
+    summary.title = `${diffChangedPages.length} of ${comparison.sharedPages.length} shared pages differ`;
+  }
+
+  // Both panes render the same page pair, each showing its own side.
+  comparePane.setView("transcript");
+  if (transcripts.studio) {
+    transcripts.studio.setDocument(pagesMap, {
+      restrictToPage: null,
+      renderPage: (page) => diffFor(page).aHtml
+    });
+  }
+  comparePane.transcript.setDocument(pagesB, {
+    restrictToPage: null,
+    renderPage: (page) => diffFor(page).bHtml
+  });
+
+  updateDiffNavButtons();
+}
+
+/** Diff one page pair, remembering the result. */
+function diffFor(page) {
+  if (diffCache.has(page)) return diffCache.get(page);
+
+  const a = pagesMap[page];
+  const b = comparePane ? comparePane.pagesMap[page] : undefined;
+
+  let result;
+  if (a === undefined || b === undefined) {
+    // A page with no counterpart is not a change to show word by word; say so.
+    const side = a === undefined ? "B" : "A";
+    const notice = `<div class="diff-body diff-missing">This page exists only in ${side}.</div>`;
+    const content = escapeDiffText(a !== undefined ? a : b);
+    result = {
+      aHtml: a !== undefined ? `<div class="diff-body">${content}</div>` : notice,
+      bHtml: b !== undefined ? `<div class="diff-body">${content}</div>` : notice,
+      changed: true
+    };
+  } else {
+    result = diffPageHtml(a, b);
+  }
+
+  diffCache.set(page, result);
+  return result;
+}
+
+function escapeDiffText(text) {
+  return String(text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Jump both panes to the next or previous page that actually changed. */
+function goToChangedPage(direction) {
+  if (!diffEnabled || diffChangedPages.length === 0) return;
+
+  const current = appState.currentPdfPage;
+  let target;
+  if (direction > 0) {
+    target = diffChangedPages.find((p) => p > current);
+    if (target === undefined) target = diffChangedPages[0];
+  } else {
+    const earlier = diffChangedPages.filter((p) => p < current);
+    target = earlier.length ? earlier[earlier.length - 1] : diffChangedPages[diffChangedPages.length - 1];
+  }
+
+  goToPage(target, true);
+  updateDiffNavButtons();
+}
+
+function updateDiffNavButtons() {
+  const prevBtn = document.getElementById("studioDiffPrevBtn");
+  const nextBtn = document.getElementById("studioDiffNextBtn");
+  const hasChanges = diffEnabled && diffChangedPages.length > 0;
+  [prevBtn, nextBtn].forEach((btn) => {
+    if (btn) btn.disabled = !hasChanges;
+  });
+}
+
+/** Diff is only meaningful with a document in each pane. */
+function updateDiffAvailability() {
+  const diffBtn = document.getElementById("studioDiffBtn");
+  if (!diffBtn) return;
+  const canDiff = compareEnabled && comparePane && comparePane.doc;
+  diffBtn.style.display = compareEnabled ? "inline-flex" : "none";
+  diffBtn.disabled = !canDiff;
+  diffBtn.title = canDiff
+    ? "Highlight what changed between the two documents"
+    : "Choose a document in pane B first";
+  if (!canDiff && diffEnabled) setDiffEnabled(false);
 }
 
 /* ==========================================================================
@@ -1026,10 +1190,14 @@ function setCompareEnabled(enabled) {
     if (!comparePane) {
       comparePane = new ComparePane(host, {
         label: "B",
-        onPageChange: (page) => {
+        onPageChange: () => {
           // B driving A would fight A driving B; linking is one-way from A.
-          if (!linkPagesEnabled) return;
-          void page;
+        },
+        onDocumentLoaded: () => {
+          updateDiffAvailability();
+          // A document swap in B invalidates every cached comparison.
+          diffCache.clear();
+          if (diffEnabled) setDiffEnabled(true);
         }
       });
     }
@@ -1039,10 +1207,15 @@ function setCompareEnabled(enabled) {
     if (pdfPane) pdfPane.style.display = "none";
     if (togglePdfBtn) togglePdfBtn.classList.remove("active");
     updateLinkPagesButton();
-  } else if (pdfPane) {
-    pdfPane.style.display = "flex";
-    if (togglePdfBtn) togglePdfBtn.classList.add("active");
-    updatePdfPageView();
+    updateDiffAvailability();
+  } else {
+    if (diffEnabled) setDiffEnabled(false);
+    updateDiffAvailability();
+    if (pdfPane) {
+      pdfPane.style.display = "flex";
+      if (togglePdfBtn) togglePdfBtn.classList.add("active");
+      updatePdfPageView();
+    }
   }
 }
 

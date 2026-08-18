@@ -668,8 +668,11 @@
               <button class="btn btn-sm btn-secondary" id="studioBackToWorkspaceBtn" title="Back to Documents Workspace">
                 &larr; Workspace
               </button>
-              <div>
-                <h2 class="studio-doc-title" id="studioDocTitle">Document Name</h2>
+              <div class="studio-doc-picker">
+                <div class="studio-doc-picker-row">
+                  <span class="compare-pane-label">A</span>
+                  <select id="studioDocSelect" class="form-select form-select-sm compare-doc-select" aria-label="Choose the document for pane A"></select>
+                </div>
                 <span class="text-xs text-muted" id="studioDocMeta">Pages • Size</span>
               </div>
             </div>
@@ -684,12 +687,16 @@
               </div>
               <button class="btn btn-sm btn-secondary" id="studioCompareBtn" title="Open a second document beside this one">⇔ Compare</button>
               <button class="btn btn-sm btn-secondary active" id="studioLinkPagesBtn" title="Keep both documents on the same page number" style="display: none;">🔗 Link</button>
+              <button class="btn btn-sm btn-secondary" id="studioDiffBtn" title="Highlight what changed between the two documents" style="display: none;">± Diff</button>
+              <span class="diff-summary" id="studioDiffSummary" style="display: none;"></span>
+              <button class="btn btn-sm btn-secondary btn-icon-label" id="studioDiffPrevBtn" title="Previous changed page" aria-label="Previous changed page" style="display: none;">&uarr;</button>
+              <button class="btn btn-sm btn-secondary btn-icon-label" id="studioDiffNextBtn" title="Next changed page" aria-label="Next changed page" style="display: none;">&darr;</button>
               <button class="btn btn-sm btn-secondary active" id="studioAutoScrollBtn" title="Keep the scan in step with the transcript as you scroll">⚡ Sync</button>
               <button class="btn btn-sm btn-secondary" id="studioSearchToggleBtn" title="Find in document (Cmd+F / Ctrl+F)">🔍 Find</button>
               <button class="btn btn-sm btn-secondary active" id="studioTogglePdfBtn" title="Show or hide the scanned page">🖼️ Scan</button>
               <button class="btn btn-sm btn-secondary" id="studioSaveBtn" title="Save edits to the .md file on disk" style="display: none;">💾 Save</button>
-              <button class="btn btn-sm btn-secondary" id="studioCopyBtn" title="Copy the markdown to the clipboard">⧉ Copy</button>
-              <button class="btn btn-sm btn-primary" id="studioDownloadBtn" title="Download the markdown file">⬇ Download</button>
+              <button class="btn btn-sm btn-secondary btn-icon-label" id="studioCopyBtn" title="Copy the markdown to the clipboard" aria-label="Copy markdown">⧉</button>
+              <button class="btn btn-sm btn-primary btn-icon-label" id="studioDownloadBtn" title="Download the markdown file" aria-label="Download markdown">⬇</button>
             </div>
           </div>
 
