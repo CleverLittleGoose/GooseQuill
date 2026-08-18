@@ -15,6 +15,18 @@ class PricingSyncService:
 
     PRICING_URL = "https://ai.google.dev/gemini-api/docs/pricing.md.txt"
 
+    # Vertex publishes its own rates at
+    # https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing
+    # and they are NOT synced. That page has no machine-readable equivalent —
+    # `.md.txt` 404s — so reading it would mean scraping 16 tables out of a
+    # 2.8 MB templated HTML page, which would break quietly and report wrong
+    # prices rather than no prices. For every model in the registry the Vertex
+    # rates matched the Gemini API rates when checked on 2026-08-18, so the
+    # estimates hold in either mode; if they ever diverge, Vertex is
+    # authoritative for Vertex and the UI links there.
+    VERTEX_PRICING_DOC = ("https://cloud.google.com/gemini-enterprise-agent-platform"
+                          "/generative-ai/pricing")
+
     def __init__(self, cache_dir: Optional[Path] = None, timeout: float = 8.0):
         self.cache_dir = Path(cache_dir) if cache_dir else Path(".cache")
         self.cache_file = self.cache_dir / "pricing_overrides.json"

@@ -122,7 +122,7 @@ Two limitations, both stated plainly rather than discovered later:
 | | |
 |---|---|
 | **Batch jobs** | Not available. The batch flow uploads its payload through the Gemini File API, which Vertex doesn't offer — it stages batch input in Cloud Storage instead, which GooseQuill doesn't implement. Convert normally and pay the standard rate rather than the 50% batch rate. |
-| **Cost estimates** | Approximate. The **Sync Pricing** feature reads Google's *Gemini API* pricing page, and Vertex publishes its own rates at [cloud.google.com/vertex-ai/pricing](https://cloud.google.com/vertex-ai/pricing). Treat the figures as a guide in Vertex mode. |
+| **Cost estimates** | Still accurate, but not synced. Vertex publishes its own rates, [here](https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing) — and for every model GooseQuill ships a rate card for, they match the Gemini API rates (spot-checked 18 August 2026: Flash-Lite, 3.7 Flash, 3.5 Flash and 2.5 Pro all agree on input *and* output). **Sync Pricing** reads the Gemini API page, because that one is published as a machine-readable document and the Vertex page is not. If the two ever diverge, the Vertex page is authoritative for Vertex. |
 
 #### Keeping the key safe
 
