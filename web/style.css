@@ -2526,3 +2526,161 @@ input[type="checkbox"]:focus-visible {
 .studio-workspace-body:has(.studio-compare-pane:not([style*="display: none"])) .studio-markdown-pane {
   flex: 1 1 50%;
 }
+
+/* ==========================================================================
+   Page Index Thumbnails
+   ========================================================================== */
+.studio-outline-pane {
+  width: 150px;
+}
+
+.studio-page-item {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  padding: 7px;
+}
+
+.studio-page-thumb-frame {
+  width: 100%;
+  aspect-ratio: 1 / 1.414;          /* A4, so a row keeps its height before the image lands */
+  background-color: #0b1220;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 3px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.studio-page-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background-color: #fff;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.studio-page-thumb[src] {
+  opacity: 1;
+}
+
+.studio-page-item-label {
+  font-size: 11.5px;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+.studio-page-item.active .studio-page-thumb-frame {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 1px var(--primary-color);
+}
+
+/* ==========================================================================
+   PDF Zoom Controls
+   ========================================================================== */
+.pdf-controls-bar {
+  flex-wrap: wrap;
+}
+
+.pdf-zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.pdf-zoom-controls .btn {
+  min-width: 24px;
+  padding: 2px 6px;
+}
+
+.pdf-zoom-level {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 38px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Fit the whole page: the default, so a page can be read end to end. */
+.pdf-render-canvas-wrapper.zoom-fit-page {
+  align-items: center;
+}
+
+.pdf-render-canvas-wrapper.zoom-fit-page .pdf-page-image {
+  max-height: 100%;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+}
+
+.pdf-render-canvas-wrapper.zoom-fit-width .pdf-page-image {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Zoomed past the pane: scroll in both directions. */
+.pdf-render-canvas-wrapper.zoom-scaled {
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+/* ==========================================================================
+   Pane Splitters
+   ========================================================================== */
+.studio-splitter {
+  flex: 0 0 6px;
+  align-self: stretch;
+  border-radius: 3px;
+  background-color: transparent;
+  cursor: col-resize;
+  position: relative;
+  transition: background-color 0.15s ease;
+}
+
+/* A wider invisible hit area than the visible 6px, so the handle is grabbable. */
+.studio-splitter::after {
+  content: "";
+  position: absolute;
+  inset: 0 -4px;
+}
+
+.studio-splitter::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 34px;
+  border-radius: 1px;
+  background-color: rgba(255, 255, 255, 0.16);
+  transition: background-color 0.15s ease;
+}
+
+.studio-splitter:hover,
+.studio-splitter.dragging,
+.studio-splitter:focus-visible {
+  background-color: rgba(59, 130, 246, 0.22);
+  outline: none;
+}
+
+.studio-splitter:hover::before,
+.studio-splitter.dragging::before,
+.studio-splitter:focus-visible::before {
+  background-color: var(--primary-color);
+}
+
+/* While dragging, stop the panes stealing the pointer or selecting text. */
+body.is-resizing-panes {
+  user-select: none;
+  cursor: col-resize;
+}
+
+body.is-resizing-panes iframe,
+body.is-resizing-panes .studio-pane {
+  pointer-events: none;
+}

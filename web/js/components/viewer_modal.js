@@ -249,6 +249,13 @@ export function initViewerModal() {
   if (viewerDownloadBtn) viewerDownloadBtn.addEventListener("click", handleDownload);
   if (studioDownloadBtn) studioDownloadBtn.addEventListener("click", handleDownload);
 
+  initStudioSplitters();
+
+  // PDF zoom
+  document.querySelectorAll(".pdf-zoom-controls [data-zoom]").forEach((btn) => {
+    btn.addEventListener("click", () => setZoom(btn.dataset.zoom));
+  });
+
   // Compare (second document)
   const studioCompareBtn = document.getElementById("studioCompareBtn");
   const studioLinkPagesBtn = document.getElementById("studioLinkPagesBtn");
@@ -577,25 +584,68 @@ function ensureTranscriptViews() {
 /**
  * Render Studio Page Jump List Outline
  */
+// Thumbnails are rendered server-side at this dpi: about 12KB per page against
+// 190KB for a full preview, and legible enough to recognise a page by shape.
+const THUMBNAIL_DPI = 20;
+
+let thumbnailObserver = null;
+
+/**
+ * Build the page index.
+ *
+ * Every row used to read "Page N ✓", with the tick on all of them — a list
+ * carrying no information you could navigate by. Rows now show the page itself,
+ * fetched only when the row scrolls into view so a 200-page filing does not
+ * fire 200 renders on open.
+ */
 function renderStudioPageList() {
   const pageListContainer = document.getElementById("studioPageList");
   const studioPageCount = document.getElementById("studioPageCount");
   if (!pageListContainer) return;
 
+  if (thumbnailObserver) thumbnailObserver.disconnect();
   pageListContainer.innerHTML = "";
+
   const total = appState.totalPdfPages || 1;
   if (studioPageCount) studioPageCount.textContent = total;
 
-  for (let p = 1; p <= total; p++) {
+  thumbnailObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        const img = entry.target.querySelector(".studio-page-thumb");
+        if (img && !img.src && img.dataset.src) img.src = img.dataset.src;
+        thumbnailObserver.unobserve(entry.target);
+      });
+    },
+    { root: pageListContainer, rootMargin: "400px 0px" }
+  );
+
+  const pdfPath = appState.currentViewingPdfPath;
+  const fragment = document.createDocumentFragment();
+
+  for (let page = 1; page <= total; page++) {
     const item = document.createElement("div");
-    item.className = `studio-page-item ${p === appState.currentPdfPage ? "active" : ""}`;
-    item.dataset.page = p;
-    item.innerHTML = `<span>Page ${p}</span><span class="text-xs text-muted">${pagesMap[p] ? "✓" : "•"}</span>`;
-    item.addEventListener("click", () => {
-      goToPage(p, true);
-    });
-    pageListContainer.appendChild(item);
+    item.className = `studio-page-item ${page === appState.currentPdfPage ? "active" : ""}`;
+    item.dataset.page = page;
+
+    const thumbSrc = pdfPath
+      ? `/api/page_image?path=${encodeURIComponent(pdfPath)}&page=${page}&dpi=${THUMBNAIL_DPI}`
+      : "";
+
+    item.innerHTML = `
+      <div class="studio-page-thumb-frame">
+        <img class="studio-page-thumb" data-src="${thumbSrc}" alt="" loading="lazy" decoding="async">
+      </div>
+      <span class="studio-page-item-label">Page ${page}</span>
+    `;
+
+    item.addEventListener("click", () => goToPage(page, true));
+    fragment.appendChild(item);
   }
+
+  pageListContainer.appendChild(fragment);
+  pageListContainer.querySelectorAll(".studio-page-item").forEach((item) => thumbnailObserver.observe(item));
 }
 
 function updateStudioOutlineActiveItem() {
@@ -623,6 +673,7 @@ export async function openDocumentInStudio(doc) {
   if (tabNavStudioDocName) tabNavStudioDocName.textContent = doc.name;
 
   switchStudioView("studio");
+  applyZoom();
   await loadAndRenderDoc(doc);
 }
 
@@ -698,7 +749,7 @@ async function loadAndRenderDoc(doc) {
 function renderStudioView() {
   renderStudioPageList();
   updateViewerDisplay();
-  updatePdfPageView();
+  applyZoom();
 }
 
 /**
@@ -726,7 +777,7 @@ export function updatePdfPageView() {
   if (!appState.currentViewingPdfPath) return;
 
   const pageStr = `Page ${appState.currentPdfPage} of ${appState.totalPdfPages}`;
-  const imgUrl = `/api/page_image?path=${encodeURIComponent(appState.currentViewingPdfPath)}&page=${appState.currentPdfPage}`;
+  const imgUrl = `/api/page_image?path=${encodeURIComponent(appState.currentViewingPdfPath)}&page=${appState.currentPdfPage}&dpi=${dpiForZoom()}`;
   const isFirst = appState.currentPdfPage <= 1;
   const isLast = appState.currentPdfPage >= appState.totalPdfPages;
 
@@ -739,7 +790,7 @@ export function updatePdfPageView() {
   if (pdfPageIndicator) pdfPageIndicator.textContent = pageStr;
   if (pdfPrevPageBtn) pdfPrevPageBtn.disabled = isFirst;
   if (pdfNextPageBtn) pdfNextPageBtn.disabled = isLast;
-  if (pdfPageImage) pdfPageImage.src = imgUrl;
+  if (pdfPageImage && pdfPageImage.getAttribute("src") !== imgUrl) pdfPageImage.src = imgUrl;
 
   // Studio
   const studioPdfPageIndicator = document.getElementById("studioPdfPageIndicator");
@@ -750,7 +801,201 @@ export function updatePdfPageView() {
   if (studioPdfPageIndicator) studioPdfPageIndicator.textContent = pageStr;
   if (studioPdfPrevPageBtn) studioPdfPrevPageBtn.disabled = isFirst;
   if (studioPdfNextPageBtn) studioPdfNextPageBtn.disabled = isLast;
-  if (studioPdfPageImage) studioPdfPageImage.src = imgUrl;
+  if (studioPdfPageImage && studioPdfPageImage.getAttribute("src") !== imgUrl) studioPdfPageImage.src = imgUrl;
+}
+
+/* ==========================================================================
+   PANE SPLITTERS
+   ========================================================================== */
+
+const SPLITTER_STORAGE_KEY = "goosequill.studio.panes";
+const OUTLINE_MIN_WIDTH = 90;
+const OUTLINE_MAX_WIDTH = 320;
+const TRANSCRIPT_MIN_FRACTION = 0.2;
+const TRANSCRIPT_MAX_FRACTION = 0.8;
+
+function readPaneLayout() {
+  try {
+    return JSON.parse(localStorage.getItem(SPLITTER_STORAGE_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function writePaneLayout(patch) {
+  try {
+    localStorage.setItem(SPLITTER_STORAGE_KEY, JSON.stringify({ ...readPaneLayout(), ...patch }));
+  } catch {
+    // A full or blocked localStorage should not stop the pane from resizing.
+  }
+}
+
+/** Restore the sizes the user last dragged to. */
+function applyStoredPaneLayout() {
+  const layout = readPaneLayout();
+  const outline = document.getElementById("studioOutlinePane");
+  const markdown = document.getElementById("studioMarkdownPane");
+
+  if (outline && typeof layout.outlineWidth === "number") {
+    outline.style.width = `${clamp(layout.outlineWidth, OUTLINE_MIN_WIDTH, OUTLINE_MAX_WIDTH)}px`;
+  }
+  if (markdown && typeof layout.transcriptFraction === "number") {
+    const fraction = clamp(layout.transcriptFraction, TRANSCRIPT_MIN_FRACTION, TRANSCRIPT_MAX_FRACTION);
+    markdown.style.flex = `1 1 ${(fraction * 100).toFixed(2)}%`;
+  }
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(value, max));
+}
+
+/**
+ * Make a divider draggable.
+ *
+ * Pointer capture keeps the drag alive when the cursor outruns the 6px handle,
+ * which is most of the time.
+ */
+function initSplitter(splitterId, onDrag) {
+  const splitter = document.getElementById(splitterId);
+  if (!splitter) return;
+
+  const start = (event) => {
+    event.preventDefault();
+    splitter.setPointerCapture(event.pointerId);
+    splitter.classList.add("dragging");
+    document.body.classList.add("is-resizing-panes");
+
+    const move = (moveEvent) => onDrag(moveEvent.clientX);
+    const end = (endEvent) => {
+      splitter.releasePointerCapture(endEvent.pointerId);
+      splitter.classList.remove("dragging");
+      document.body.classList.remove("is-resizing-panes");
+      splitter.removeEventListener("pointermove", move);
+      splitter.removeEventListener("pointerup", end);
+      splitter.removeEventListener("pointercancel", end);
+    };
+
+    splitter.addEventListener("pointermove", move);
+    splitter.addEventListener("pointerup", end);
+    splitter.addEventListener("pointercancel", end);
+  };
+
+  splitter.addEventListener("pointerdown", start);
+
+  // Keyboard: a divider that only responds to a mouse is not usable by everyone.
+  splitter.addEventListener("keydown", (event) => {
+    const step = event.shiftKey ? 48 : 16;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      onDrag(splitter.getBoundingClientRect().left - step);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      onDrag(splitter.getBoundingClientRect().left + step);
+    }
+  });
+}
+
+function initStudioSplitters() {
+  const outline = document.getElementById("studioOutlinePane");
+  const markdown = document.getElementById("studioMarkdownPane");
+  const body = document.querySelector(".studio-workspace-body");
+
+  initSplitter("studioSplitterOutline", (clientX) => {
+    if (!outline) return;
+    const width = clamp(clientX - outline.getBoundingClientRect().left, OUTLINE_MIN_WIDTH, OUTLINE_MAX_WIDTH);
+    outline.style.width = `${Math.round(width)}px`;
+    writePaneLayout({ outlineWidth: Math.round(width) });
+  });
+
+  initSplitter("studioSplitterMain", (clientX) => {
+    if (!markdown || !body) return;
+    const markdownLeft = markdown.getBoundingClientRect().left;
+    const available = body.getBoundingClientRect().right - markdownLeft;
+    if (available <= 0) return;
+
+    const fraction = clamp((clientX - markdownLeft) / available, TRANSCRIPT_MIN_FRACTION, TRANSCRIPT_MAX_FRACTION);
+    markdown.style.flex = `1 1 ${(fraction * 100).toFixed(2)}%`;
+    writePaneLayout({ transcriptFraction: fraction });
+  });
+
+  applyStoredPaneLayout();
+}
+
+/* ==========================================================================
+   PDF ZOOM
+   ========================================================================== */
+
+// "fit-page" is the default because the previous behaviour — fit-to-width only —
+// meant a portrait page was always taller than its pane, so you could never see
+// a whole page at once in a tool whose job is checking pages.
+const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
+let zoomMode = "fit-page";   // "fit-page" | "fit-width" | number index into ZOOM_STEPS
+let zoomIndex = 2;           // used only when zoomMode === "scale"
+
+/** Render dpi to ask the server for, given how far in we are zoomed. */
+function dpiForZoom() {
+  if (zoomMode !== "scale") return 150;
+  const scale = ZOOM_STEPS[zoomIndex];
+  // Past 1.5x a 150dpi raster starts to look soft; ask for more pixels instead.
+  return scale > 1.5 ? 300 : 150;
+}
+
+function setZoom(action) {
+  if (action === "fit-page" || action === "fit-width") {
+    zoomMode = action;
+  } else if (action === "in") {
+    if (zoomMode !== "scale") {
+      zoomMode = "scale";
+      zoomIndex = 2;
+    } else {
+      zoomIndex = Math.min(zoomIndex + 1, ZOOM_STEPS.length - 1);
+    }
+  } else if (action === "out") {
+    if (zoomMode !== "scale") {
+      zoomMode = "scale";
+      zoomIndex = 1;
+    } else {
+      zoomIndex = Math.max(zoomIndex - 1, 0);
+    }
+  }
+  applyZoom();
+}
+
+function applyZoom() {
+  const img = document.getElementById("studioPdfPageImage");
+  const wrapper = document.getElementById("studioPdfCanvasWrapper");
+  const label = document.getElementById("studioPdfZoomLevel");
+  if (!img || !wrapper) return;
+
+  wrapper.classList.toggle("zoom-fit-page", zoomMode === "fit-page");
+  wrapper.classList.toggle("zoom-fit-width", zoomMode === "fit-width");
+  wrapper.classList.toggle("zoom-scaled", zoomMode === "scale");
+
+  if (zoomMode === "scale") {
+    img.style.width = `${Math.round(ZOOM_STEPS[zoomIndex] * 100)}%`;
+    img.style.maxWidth = "none";
+    img.style.maxHeight = "none";
+  } else {
+    img.style.width = "";
+    img.style.maxWidth = "";
+    img.style.maxHeight = "";
+  }
+
+  if (label) {
+    label.textContent =
+      zoomMode === "scale" ? `${Math.round(ZOOM_STEPS[zoomIndex] * 100)}%`
+        : zoomMode === "fit-width" ? "Width"
+        : "Fit";
+  }
+
+  document.querySelectorAll(".pdf-zoom-controls [data-zoom]").forEach((btn) => {
+    const isActive =
+      (btn.dataset.zoom === "fit-page" && zoomMode === "fit-page") ||
+      (btn.dataset.zoom === "fit-width" && zoomMode === "fit-width");
+    btn.classList.toggle("active", isActive);
+  });
+
+  updatePdfPageView();
 }
 
 /* ==========================================================================

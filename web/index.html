@@ -703,6 +703,8 @@
               <div class="studio-page-list" id="studioPageList"></div>
             </div>
 
+            <div class="studio-splitter" id="studioSplitterOutline" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Resize page index"></div>
+
             <!-- Center: Markdown Transcript (Rendered or Raw Editor) -->
             <div class="studio-pane studio-markdown-pane" id="studioMarkdownPane">
               <!-- Search Toolbar -->
@@ -747,12 +749,21 @@
               </div>
             </div>
 
+            <div class="studio-splitter" id="studioSplitterMain" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Resize transcript pane"></div>
+
             <!-- Right: Scanned PDF Preview Canvas -->
             <div class="studio-pane studio-pdf-pane" id="studioPdfPane">
               <div class="pdf-controls-bar">
                 <button class="btn btn-xs btn-secondary" id="studioPdfPrevPageBtn">&larr; Prev</button>
                 <span class="text-xs" id="studioPdfPageIndicator">Page 1 of 1</span>
                 <button class="btn btn-xs btn-secondary" id="studioPdfNextPageBtn">Next &rarr;</button>
+                <div class="pdf-zoom-controls" role="group" aria-label="Zoom">
+                  <button class="btn btn-xs btn-secondary" data-zoom="out" title="Zoom out">&minus;</button>
+                  <button class="btn btn-xs btn-secondary" data-zoom="fit-width" title="Fit the page width">&harr;</button>
+                  <button class="btn btn-xs btn-secondary active" data-zoom="fit-page" title="Fit the whole page">&#9633;</button>
+                  <button class="btn btn-xs btn-secondary" data-zoom="in" title="Zoom in">+</button>
+                  <span class="pdf-zoom-level" id="studioPdfZoomLevel">Fit</span>
+                </div>
               </div>
               <div class="pdf-render-canvas-wrapper" id="studioPdfCanvasWrapper">
                 <img id="studioPdfPageImage" class="pdf-page-image" alt="PDF Page Preview">

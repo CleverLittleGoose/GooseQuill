@@ -1,13 +1,14 @@
 import os
 import sys
 import json
+import hashlib
 import time
 import shutil
 import threading
 import logging
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Response
+from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
@@ -51,9 +52,16 @@ logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
 app = FastAPI(title="GooseQuill — Universal PDF to Markdown")
 
+# Rendered page images are immutable for a given file+page+dpi, so they set
+# their own long-lived caching headers. Everything else stays uncacheable.
+_SELF_CACHING_PATHS = ("/api/page_image",)
+
+
 @app.middleware("http")
 async def add_no_cache_header(request, call_next):
     response = await call_next(request)
+    if request.url.path.startswith(_SELF_CACHING_PATHS):
+        return response
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
@@ -434,17 +442,49 @@ def save_markdown(req: SaveMarkdownRequest):
     markdown_assembler.save_document(p, req.content)
     return {"status": "saved", "path": str(p)}
 
+# Bounds for the client's zoom control. Below the floor thumbnails stop being
+# legible; above the ceiling a single page costs more to render than it is worth.
+MIN_PAGE_DPI = 16
+MAX_PAGE_DPI = 400
+
+
 @app.get("/api/page_image")
-def get_page_image(path: str, page: int = 1):
-    """Render a specific PDF page as PNG image for verification."""
+def get_page_image(request: Request, path: str, page: int = 1, dpi: int = 150):
+    """Render a specific PDF page as a PNG.
+
+    The result depends only on the file's contents, the page and the dpi, so it
+    carries a strong ETag and a long max-age. Without them every page turn
+    re-rasterised the page server-side — about 90ms and 290KB each time, behind
+    a global PDFium lock — and flipping back to a page you had just viewed paid
+    the full cost again.
+    """
     p = _resolve_within_root(path)
     if p.suffix.lower() != ".pdf":
         raise HTTPException(status_code=400, detail="Only PDF files can be rendered.")
     if not p.exists():
         raise HTTPException(status_code=404, detail="PDF not found")
+
+    dpi = max(MIN_PAGE_DPI, min(int(dpi), MAX_PAGE_DPI))
+
     try:
-        img_bytes = pdf_renderer.render_page_from_path(p, page, dpi=150)
-        return Response(content=img_bytes, media_type="image/png")
+        stat = p.stat()
+        etag = '"{}"'.format(
+            hashlib.sha1(
+                f"{p.resolve()}|{stat.st_size}|{stat.st_mtime_ns}|{page}|{dpi}".encode("utf-8")
+            ).hexdigest()
+        )
+    except OSError:
+        etag = None
+
+    cache_headers = {"Cache-Control": "private, max-age=86400"}
+    if etag:
+        cache_headers["ETag"] = etag
+        if request.headers.get("if-none-match") == etag:
+            return Response(status_code=304, headers=cache_headers)
+
+    try:
+        img_bytes = pdf_renderer.render_page_from_path(p, page, dpi=dpi)
+        return Response(content=img_bytes, media_type="image/png", headers=cache_headers)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

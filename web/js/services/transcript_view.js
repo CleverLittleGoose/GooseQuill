@@ -434,6 +434,10 @@ export class TranscriptView {
   _highlightWithinSection(section, ordinal) {
     if (!this.searchQuery) return null;
 
+    // goToHit renders the page (which highlights) and then highlights again;
+    // without this the same match ends up wrapped twice.
+    this._stripMarks(section);
+
     const walker = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
         if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_SKIP;
@@ -472,7 +476,11 @@ export class TranscriptView {
   _clearHighlight() {
     const section = this.highlightedSection;
     this.highlightedSection = null;
-    if (!section) return;
+    if (section) this._stripMarks(section);
+  }
+
+  /** Unwrap every search mark inside one section, restoring the plain text. */
+  _stripMarks(section) {
     section.querySelectorAll("mark.viewer-search-match").forEach((mark) => {
       const parent = mark.parentNode;
       if (!parent) return;
