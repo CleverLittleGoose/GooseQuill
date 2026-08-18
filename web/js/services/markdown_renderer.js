@@ -177,7 +177,7 @@ class MarkdownRenderer {
     // Page-level wrapper emitted directly after a page header, e.g.
     // `<!-- Page 3 -->\n## Page 3\n\u0060\u0060\u0060markdown\n...\n\u0060\u0060\u0060`
     const processed = markdownText.replace(
-      /(<!--\s*Page\s+\d+\s*-->\s*(?:##\s*Page\s+\d+\s*)?)```(?:markdown|md)?[ \t]*\n([\s\S]*?)\n```[ \t]*(?=\n|$)/gi,
+      /((?:<!--\s*Page\s+\d+\s*-->\s*(?:##\s*Page\s+\d+\s*)?|##\s*Page\s+\d+\s*))```(?:markdown|md)?[ \t]*\n([\s\S]*?)\n```[ \t]*(?=\n|$)/gi,
       (match, prefix, inner) => (inner.includes("```") ? match : `${prefix}\n${inner}\n`)
     );
 

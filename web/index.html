@@ -682,12 +682,14 @@
                 <button class="btn btn-sm btn-secondary active" id="studioScopeAllBtn" title="Full Document">📜 Full Doc</button>
                 <button class="btn btn-sm btn-secondary" id="studioScopePageBtn" title="Current Page Only">📄 Page Only</button>
               </div>
-              <button class="btn btn-sm btn-secondary active" id="studioAutoScrollBtn" title="Synchronize scrolling between Markdown and PDF preview">⚡ Auto-Sync</button>
-              <button class="btn btn-sm btn-secondary" id="studioSearchToggleBtn" title="Search in document (Cmd+F / Ctrl+F)">🔍 Search</button>
-              <button class="btn btn-sm btn-secondary" id="studioTogglePdfBtn">Hide PDF Split</button>
+              <button class="btn btn-sm btn-secondary" id="studioCompareBtn" title="Open a second document beside this one">⇔ Compare</button>
+              <button class="btn btn-sm btn-secondary active" id="studioLinkPagesBtn" title="Keep both documents on the same page number" style="display: none;">🔗 Link</button>
+              <button class="btn btn-sm btn-secondary active" id="studioAutoScrollBtn" title="Keep the scan in step with the transcript as you scroll">⚡ Sync</button>
+              <button class="btn btn-sm btn-secondary" id="studioSearchToggleBtn" title="Find in document (Cmd+F / Ctrl+F)">🔍 Find</button>
+              <button class="btn btn-sm btn-secondary active" id="studioTogglePdfBtn" title="Show or hide the scanned page">🖼️ Scan</button>
               <button class="btn btn-sm btn-secondary" id="studioSaveBtn" title="Save edits to the .md file on disk" style="display: none;">💾 Save</button>
-              <button class="btn btn-sm btn-secondary" id="studioCopyBtn">Copy Markdown</button>
-              <button class="btn btn-sm btn-primary" id="studioDownloadBtn">Download .md</button>
+              <button class="btn btn-sm btn-secondary" id="studioCopyBtn" title="Copy the markdown to the clipboard">⧉ Copy</button>
+              <button class="btn btn-sm btn-primary" id="studioDownloadBtn" title="Download the markdown file">⬇ Download</button>
             </div>
           </div>
 
@@ -756,6 +758,9 @@
                 <img id="studioPdfPageImage" class="pdf-page-image" alt="PDF Page Preview">
               </div>
             </div>
+
+            <!-- Compare: second document, hidden until Compare is turned on -->
+            <div class="studio-pane studio-compare-pane" id="studioComparePane" style="display: none;"></div>
           </div>
         </div>
       </div>

@@ -2450,3 +2450,79 @@ input[type="checkbox"]:focus-visible {
   );
   border-radius: 6px;
 }
+
+/* ==========================================================================
+   Studio Compare Pane (second document)
+   ========================================================================== */
+.studio-compare-pane {
+  flex: 1 1 50%;
+  min-width: 0;
+  background-color: var(--bg-surface);
+}
+
+.compare-pane-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background-color: var(--bg-surface-raised);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.compare-pane-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--primary-color);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* The picker takes the slack: filing names are long and the toggle must stay put. */
+.compare-doc-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.compare-view-toggle {
+  flex-shrink: 0;
+}
+
+.compare-pane-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.compare-transcript-pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.compare-transcript-content {
+  flex: 1 0 auto;
+}
+
+.compare-pdf-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-app);
+}
+
+/* With Compare on, the transcript pane shares the row rather than owning it. */
+.studio-workspace-body:has(.studio-compare-pane:not([style*="display: none"])) .studio-markdown-pane {
+  flex: 1 1 50%;
+}

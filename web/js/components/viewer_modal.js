@@ -7,6 +7,7 @@
 import { appState, eventBus } from "../state.js";
 import { showToast } from "../services/notifications.js";
 import { TranscriptView } from "../services/transcript_view.js";
+import { ComparePane } from "./compare_pane.js";
 import { switchStudioView } from "./header.js";
 
 let autoSyncEnabled = true;
@@ -26,6 +27,11 @@ const transcripts = { viewer: null, studio: null };
 function getActiveTranscript() {
   return getActiveContext().isModal ? transcripts.viewer : transcripts.studio;
 }
+
+// Studio's second document. Null until Compare is switched on.
+let comparePane = null;
+let compareEnabled = false;
+let linkPagesEnabled = true;
 
 // Viewer & Studio State
 let viewerFormat = "rendered"; // "rendered" | "raw"
@@ -138,7 +144,7 @@ export function initViewerModal() {
     [viewerAutoScrollBtn, studioAutoScrollBtn].forEach((btn) => {
       if (btn) {
         btn.classList.toggle("active", autoSyncEnabled);
-        btn.textContent = autoSyncEnabled ? "⚡ Auto-Sync" : "⚡ Auto-Sync (Off)";
+        btn.textContent = autoSyncEnabled ? "⚡ Sync" : "⚡ Sync (Off)";
       }
     });
   };
@@ -194,7 +200,7 @@ export function initViewerModal() {
       if (!studioPdfPane) return;
       const isVisible = studioPdfPane.style.display !== "none";
       studioPdfPane.style.display = isVisible ? "none" : "flex";
-      studioTogglePdfBtn.textContent = isVisible ? "Show PDF Split" : "Hide PDF Split";
+      studioTogglePdfBtn.classList.toggle("active", !isVisible);
       if (!isVisible) updatePdfPageView();
     });
   }
@@ -242,6 +248,20 @@ export function initViewerModal() {
   };
   if (viewerDownloadBtn) viewerDownloadBtn.addEventListener("click", handleDownload);
   if (studioDownloadBtn) studioDownloadBtn.addEventListener("click", handleDownload);
+
+  // Compare (second document)
+  const studioCompareBtn = document.getElementById("studioCompareBtn");
+  const studioLinkPagesBtn = document.getElementById("studioLinkPagesBtn");
+  if (studioCompareBtn) {
+    studioCompareBtn.addEventListener("click", () => setCompareEnabled(!compareEnabled));
+  }
+  if (studioLinkPagesBtn) {
+    studioLinkPagesBtn.addEventListener("click", () => {
+      linkPagesEnabled = !linkPagesEnabled;
+      updateLinkPagesButton();
+      if (linkPagesEnabled) syncComparePane(appState.currentPdfPage);
+    });
+  }
 
   // Raw editor persistence
   const viewerSaveBtn = document.getElementById("viewerSaveBtn");
@@ -420,6 +440,14 @@ function parseMarkdownPages(fullMarkdown) {
     pages[1] = fullMarkdown.trim();
     return pages;
   }
+
+  // The assembler writes both "<!-- Page N -->" and "## Page N", and the
+  // pattern matches each of them. Left as two splits, page N would be cut in
+  // half and the half that survived would lose its comment marker — which is
+  // what the fence unwrapper keys on. Keep only the first split per page.
+  const deduped = splits.filter((split, i) => i === 0 || split.pageNum !== splits[i - 1].pageNum);
+  splits.length = 0;
+  splits.push(...deduped);
 
   // Everything before the first page marker is the document header the
   // converter writes (title, source file, model). Splitting on markers alone
@@ -694,6 +722,7 @@ export function goToPage(pageNumber, scrollToMarkdown = true) {
  * Update PDF preview canvas image across Modal and Studio
  */
 export function updatePdfPageView() {
+  syncComparePane(appState.currentPdfPage);
   if (!appState.currentViewingPdfPath) return;
 
   const pageStr = `Page ${appState.currentPdfPage} of ${appState.totalPdfPages}`;
@@ -722,6 +751,67 @@ export function updatePdfPageView() {
   if (studioPdfPrevPageBtn) studioPdfPrevPageBtn.disabled = isFirst;
   if (studioPdfNextPageBtn) studioPdfNextPageBtn.disabled = isLast;
   if (studioPdfPageImage) studioPdfPageImage.src = imgUrl;
+}
+
+/* ==========================================================================
+   COMPARE (SECOND DOCUMENT)
+   ========================================================================== */
+
+/**
+ * Turn the side-by-side view on or off.
+ *
+ * Pane A stays whatever the Workspace opened; pane B carries its own picker.
+ * Turning Compare on hides A's scan so the two transcripts get the full width —
+ * A's scan is one click away on the existing "Show PDF Split" toggle.
+ */
+function setCompareEnabled(enabled) {
+  const host = document.getElementById("studioComparePane");
+  const compareBtn = document.getElementById("studioCompareBtn");
+  const linkBtn = document.getElementById("studioLinkPagesBtn");
+  const pdfPane = document.getElementById("studioPdfPane");
+  const togglePdfBtn = document.getElementById("studioTogglePdfBtn");
+  if (!host) return;
+
+  compareEnabled = enabled;
+  host.style.display = enabled ? "flex" : "none";
+  if (compareBtn) compareBtn.classList.toggle("active", enabled);
+  if (linkBtn) linkBtn.style.display = enabled ? "inline-flex" : "none";
+
+  if (enabled) {
+    if (!comparePane) {
+      comparePane = new ComparePane(host, {
+        label: "B",
+        onPageChange: (page) => {
+          // B driving A would fight A driving B; linking is one-way from A.
+          if (!linkPagesEnabled) return;
+          void page;
+        }
+      });
+    }
+    comparePane.populateDocuments();
+
+    // Two documents need the width more than A's scan does.
+    if (pdfPane) pdfPane.style.display = "none";
+    if (togglePdfBtn) togglePdfBtn.classList.remove("active");
+    updateLinkPagesButton();
+  } else if (pdfPane) {
+    pdfPane.style.display = "flex";
+    if (togglePdfBtn) togglePdfBtn.classList.add("active");
+    updatePdfPageView();
+  }
+}
+
+function updateLinkPagesButton() {
+  const linkBtn = document.getElementById("studioLinkPagesBtn");
+  if (!linkBtn) return;
+  linkBtn.classList.toggle("active", linkPagesEnabled);
+  linkBtn.textContent = linkPagesEnabled ? "🔗 Link" : "🔗 Link (Off)";
+}
+
+/** Keep pane B on the same page number as pane A. */
+function syncComparePane(page) {
+  if (!compareEnabled || !linkPagesEnabled || !comparePane || !comparePane.doc) return;
+  comparePane.goToPage(page);
 }
 
 /* ==========================================================================
