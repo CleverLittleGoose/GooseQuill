@@ -107,11 +107,26 @@ export function initSettingsModal() {
       if (forceReprocessCheckbox) appState.forceReprocess = forceReprocessCheckbox.checked;
       if (systemPromptTextarea) appState.systemPrompt = systemPromptTextarea.value;
 
-      if (settingsModal) settingsModal.style.display = "none";
-      showToast("Settings Saved", `Model set to ${appState.model}.`);
+      const newPath = workingDirInput ? workingDirInput.value.trim() : "";
+      let dirChanged = false;
+      if (newPath && newPath !== appState.rootDirectory) {
+        try {
+          const res = await apiClient.setRootFolder(newPath);
+          if (res && res.status === "success") {
+            appState.rootDirectory = res.root_directory;
+            dirChanged = true;
+          }
+        } catch (dirErr) {
+          showToast("Directory Error", dirErr.message, true);
+          return;
+        }
+      }
 
-      if (oldModel !== appState.model) {
-        await testApiConnection(true);
+      if (settingsModal) settingsModal.style.display = "none";
+      showToast("Settings Saved", dirChanged ? `Workspace set to ${appState.rootDirectory}` : `Model set to ${appState.model}.`);
+
+      if (dirChanged || oldModel !== appState.model) {
+        if (oldModel !== appState.model) await testApiConnection(true);
         eventBus.emit("documents:reload");
       }
     });
@@ -162,18 +177,14 @@ export function initSettingsModal() {
       if (!newPath) return;
 
       try {
-        const res = await fetch("/api/set_working_dir", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: newPath })
-        });
-        if (res.ok) {
-          showToast("Workspace Switched", `Active directory set to ${newPath}`);
+        const res = await apiClient.setRootFolder(newPath);
+        if (res && res.status === "success") {
+          appState.rootDirectory = res.root_directory;
+          showToast("Workspace Switched", `Active directory set to ${res.root_directory}`);
           eventBus.emit("documents:reload");
           if (settingsModal) settingsModal.style.display = "none";
         } else {
-          const data = await res.json();
-          showToast("Directory Error", data.detail || "Invalid path", true);
+          showToast("Directory Error", (res && res.detail) || "Invalid path", true);
         }
       } catch (e) {
         showToast("Error", e.message, true);

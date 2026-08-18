@@ -56,6 +56,10 @@ def favicon():
     svg_favicon = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📄</text></svg>"""
     return Response(content=svg_favicon, media_type="image/svg+xml")
 
+@app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)
+def chrome_devtools_probe():
+    return Response(status_code=204)
+
 # Dynamic project paths
 PROJECT_ROOT = Path(__file__).resolve().parent
 BASE_ACCOUNTS_DIR = PROJECT_ROOT / "Accounts" if (PROJECT_ROOT / "Accounts").exists() else (PROJECT_ROOT / "documents")
@@ -299,7 +303,11 @@ def set_root_folder(req: SetRootFolderRequest):
     """
     global BASE_ACCOUNTS_DIR
     clean_path = req.root_path.strip()
-    p = Path(clean_path)
+    try:
+        p = Path(clean_path).expanduser().resolve()
+    except (OSError, RuntimeError):
+        raise HTTPException(status_code=400, detail="Invalid path.")
+
     if not p.exists() or not p.is_dir():
         raise HTTPException(status_code=400, detail=f"Directory does not exist: {clean_path}")
     BASE_ACCOUNTS_DIR = p

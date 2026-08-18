@@ -107,5 +107,25 @@ class TestApiEndpoints(unittest.TestCase):
         # Bundled rates must still be served so the app stays usable offline.
         self.assertIn("gemini-3.1-flash-lite", data["pricing"])
 
+    def test_chrome_devtools_probe(self):
+        """Test /.well-known/appspecific/com.chrome.devtools.json returns 204 No Content."""
+        res = self.client.get("/.well-known/appspecific/com.chrome.devtools.json")
+        self.assertEqual(res.status_code, 204)
+
+    def test_set_root_folder_endpoint(self):
+        """Test /api/set_root_folder switches documents directory with valid folder."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            res = self.client.post("/api/set_root_folder", json={"root_path": tmp_dir})
+            self.assertEqual(res.status_code, 200)
+            data = res.json()
+            self.assertEqual(data["status"], "success")
+            self.assertEqual(data["root_directory"], str(Path(tmp_dir).resolve()))
+
+        # Invalid path should return 400
+        res_bad = self.client.post("/api/set_root_folder", json={"root_path": "/nonexistent/path/12345"})
+        self.assertEqual(res_bad.status_code, 400)
+
 if __name__ == "__main__":
     unittest.main()
+

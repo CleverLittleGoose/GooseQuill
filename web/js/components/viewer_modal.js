@@ -105,6 +105,8 @@ export async function openDocumentViewer(doc) {
   const viewerDocTitle = document.getElementById("viewerDocTitle");
   const viewerDocMeta = document.getElementById("viewerDocMeta");
   const viewerMarkdownContent = document.getElementById("viewerMarkdownContent");
+  const viewerTogglePdfBtn = document.getElementById("viewerTogglePdfBtn");
+  const viewerPdfPane = document.getElementById("viewerPdfPane");
 
   appState.currentViewingDoc = doc;
   appState.currentViewingPdfPath = doc.path;
@@ -113,10 +115,20 @@ export async function openDocumentViewer(doc) {
   appState.totalPdfPages = doc.total_pages || 1;
 
   if (viewerDocTitle) viewerDocTitle.textContent = doc.name;
-  if (viewerDocMeta) viewerDocMeta.textContent = `${doc.total_pages} pages • ${(doc.file_size / 1024).toFixed(0)} KB • ${doc.folder}`;
+  if (viewerDocMeta) viewerDocMeta.textContent = `${doc.total_pages || 1} pages • ${(doc.file_size / 1024).toFixed(0)} KB • ${doc.folder}`;
 
   if (viewerMarkdownContent) {
     viewerMarkdownContent.innerHTML = `<div class="text-muted text-center" style="padding: 60px;">Loading markdown transcription...</div>`;
+  }
+
+  // Ensure split view is active by default
+  if (viewerPdfPane) {
+    if (viewerPdfPane.style.display === "none") {
+      if (viewerTogglePdfBtn) viewerTogglePdfBtn.textContent = "Show PDF Split";
+    } else {
+      viewerPdfPane.style.display = "flex";
+      if (viewerTogglePdfBtn) viewerTogglePdfBtn.textContent = "Hide PDF Split";
+    }
   }
 
   if (viewerModal) viewerModal.style.display = "flex";
@@ -144,7 +156,14 @@ function updatePdfPageView() {
   if (!appState.currentViewingPdfPath) return;
   const pdfPageIndicator = document.getElementById("pdfPageIndicator");
   const pdfPageImage = document.getElementById("pdfPageImage");
+  const pdfPrevPageBtn = document.getElementById("pdfPrevPageBtn");
+  const pdfNextPageBtn = document.getElementById("pdfNextPageBtn");
 
-  if (pdfPageIndicator) pdfPageIndicator.textContent = `Page ${appState.currentPdfPage} / ${appState.totalPdfPages}`;
-  if (pdfPageImage) pdfPageImage.src = `/api/page_image?path=${encodeURIComponent(appState.currentViewingPdfPath)}&page=${appState.currentPdfPage}`;
+  if (pdfPageIndicator) pdfPageIndicator.textContent = `Page ${appState.currentPdfPage} of ${appState.totalPdfPages}`;
+  if (pdfPrevPageBtn) pdfPrevPageBtn.disabled = appState.currentPdfPage <= 1;
+  if (pdfNextPageBtn) pdfNextPageBtn.disabled = appState.currentPdfPage >= appState.totalPdfPages;
+
+  if (pdfPageImage) {
+    pdfPageImage.src = `/api/page_image?path=${encodeURIComponent(appState.currentViewingPdfPath)}&page=${appState.currentPdfPage}`;
+  }
 }

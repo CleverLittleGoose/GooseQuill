@@ -702,7 +702,7 @@
           </div>
         </div>
         <div class="modal-header-actions">
-          <button class="btn btn-sm btn-secondary" id="viewerTogglePdfBtn">Toggle PDF Split</button>
+          <button class="btn btn-sm btn-secondary" id="viewerTogglePdfBtn">Hide PDF Split</button>
           <button class="btn btn-sm btn-secondary" id="viewerCopyBtn">Copy Markdown</button>
           <button class="btn btn-sm btn-primary" id="viewerDownloadBtn">Download .md</button>
           <button class="btn-close" id="closeViewerBtn">&times;</button>
@@ -713,7 +713,7 @@
           <div class="viewer-pane markdown-pane" id="viewerMarkdownPane">
             <div class="markdown-preview prose" id="viewerMarkdownContent"></div>
           </div>
-          <div class="viewer-pane pdf-pane" id="viewerPdfPane" style="display: none;">
+          <div class="viewer-pane pdf-pane" id="viewerPdfPane">
             <div class="pdf-controls-bar">
               <button class="btn btn-xs btn-secondary" id="pdfPrevPageBtn">&larr; Prev</button>
               <span class="text-xs" id="pdfPageIndicator">Page 1 of 1</span>
@@ -828,6 +828,17 @@
             <button class="preset-pill" data-preset="legal">Legal & Contracts</button>
           </div>
           <textarea id="systemPromptTextarea" class="form-textarea mt-2" rows="4"></textarea>
+        </div>
+
+        <div class="form-group mb-3">
+          <label for="workingDirInput">Working Documents Directory</label>
+          <div class="input-with-button">
+            <input type="text" id="workingDirInput" class="form-input" placeholder="/path/to/Accounts or documents" spellcheck="false">
+            <button type="button" class="btn btn-secondary" id="changeWorkingDirBtn">Switch Directory</button>
+          </div>
+          <span class="text-xs text-muted mt-1" style="display: block;">
+            The active root folder scanned for entities, PDFs, and transcribed Markdown output.
+          </span>
         </div>
 
         <div class="form-group mb-2">
