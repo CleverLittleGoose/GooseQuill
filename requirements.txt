@@ -1,0 +1,10 @@
+google-genai>=2.3.0
+pypdfium2>=4.30.0
+python-dotenv>=1.0.0
+pillow>=10.0.0
+fastapi>=0.110.0
+uvicorn>=0.30.0
+tqdm>=4.66.0
+python-multipart>=0.0.9
+requests>=2.31.0
+pytest>=8.0.0

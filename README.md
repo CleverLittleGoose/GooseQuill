@@ -1,0 +1,239 @@
+# GooseQuill — Universal PDF to Markdown Pipeline
+
+A high-fidelity OCR and document transcription pipeline using Google's **Gemini Interactions API** (`gemini-3.1-flash-lite`, `gemini-3.7-flash`, etc.).
+
+Built for dense statutory financial statements, balance sheets, legal filings, technical whitepapers, and general multi-page PDF documents.
+
+---
+
+## Features
+
+- **Gemini Interactions API**: Direct integration with Google's latest `interactions.create` API using `gemini-3.1-flash-lite` (default, ultra low latency & lowest cost) or full Gemini 3.x/2.5 vision models (`gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.1-pro-preview`, etc.).
+- **Live Official Pricing Sync**: On-demand synchronization with Google AI's live documentation feed ([ai.google.dev/pricing](https://ai.google.dev/gemini-api/docs/pricing)) via UI button or API endpoint.
+- **Zero External CDN Dependencies**: 100% self-contained and offline-ready with local Marked, DOMPurify, and self-hosted fonts.
+- **Smart Page-Level Caching**: Every page is cached in `.cache/` as it completes. If interrupted, the job resumes instantly without re-processing completed pages.
+- **Interactive Web Interface**:
+  - Drag-and-drop PDF uploader.
+  - Document & folder explorer with live status indicators.
+  - Side-by-side verification viewer (Original Scanned PDF Page vs. Rendered Markdown / Raw Markdown).
+  - Markdown Consolidation & Combiner Studio with live split preview, smart chronological/alphabetical sorting, Table of Contents generation, and instant export.
+  - Rich Model Picker with live specification & rate cards (Standard, Batch 50% off, Context caching).
+  - Customizable OCR prompts and presets (Financial Statements, Dense Tables, General Documents).
+  - Asynchronous Batch API jobs with 50% discount.
+- **Object-Oriented Architecture**: Modular `goosequill` Python package with typed dataclasses, single-responsibility services, and decoupled testing.
+- **Standalone CLI Tools**: Simple command-line tools for automated conversions (`convert_reports_to_markdown.py`) and markdown consolidation (`combine_markdown.py`).
+
+---
+
+## Supported Gemini Models
+
+| Model ID | Model Name | Standard Input / Output (per 1M) | Overnight Batch (50% Off) | Best For |
+|---|---|---|---|---|
+| `gemini-3.1-flash-lite` | **Gemini 3.1 Flash-Lite (Default)** | $0.25 / $1.50 | $0.125 / $0.75 | Ultra low cost, high-speed statutory OCR |
+| `gemini-3.5-flash-lite` | Gemini 3.5 Flash-Lite | $0.30 / $2.50 | $0.150 / $1.25 | Cost-efficient GA high-volume processing |
+| `gemini-3.7-flash` | Gemini 3.7 Flash | $0.75 / $3.75 | $0.375 / $1.875 | Flagship hybrid reasoning & multimodal OCR |
+| `gemini-3.6-flash` | Gemini 3.6 Flash | $0.75 / $3.75 | $0.375 / $1.875 | Frontier speed & multimodal intelligence |
+| `gemini-3.5-flash` | Gemini 3.5 Flash | $1.50 / $9.00 | $0.750 / $4.50 | Balanced intelligence & speed |
+| `gemini-3-flash-preview` | Gemini 3 Flash Preview | $0.50 / $3.00 | $0.250 / $1.50 | Next-gen flash preview |
+| `gemini-3.1-pro-preview` | Gemini 3.1 Pro Preview | $2.00 / $12.00 | $1.000 / $6.00 | Complex multi-column financial layouts |
+| `gemini-2.5-pro` | Gemini 2.5 Pro | $1.25 / $10.00 | $0.625 / $5.00 | Deep reasoning & legacy pro accuracy |
+| `gemini-2.5-flash` | Gemini 2.5 Flash | $0.30 / $2.50 | $0.150 / $1.25 | Hybrid reasoning with thinking budget |
+| `gemini-2.5-flash-lite` | Gemini 2.5 Flash-Lite | $0.10 / $0.40 | $0.050 / $0.20 | Ultra-low cost legacy scaling |
+
+*Note: For the latest official pricing tiers and limits, see [Google AI Pricing Documentation](https://ai.google.dev/gemini-api/docs/pricing).*
+
+---
+
+## Getting Started
+
+### Requirements
+
+- Python 3.10 or newer
+- A Google Gemini API key — see below
+
+### Getting a Gemini API key
+
+There are two places to get one, and **the choice matters if your documents are
+confidential**.
+
+#### Option 1 — Google AI Studio (quickest)
+
+Go to [aistudio.google.com/api-keys](https://aistudio.google.com/api-keys) and
+create a key. This is the fastest route and has a free tier.
+
+> ⚠️ **On the free tier, Google may use your prompts and responses to improve
+> their products** — which here means the contents of every PDF you process.
+> Google's own pricing tables state this explicitly ("Used to improve our
+> products: **Yes**" for Free Tier, **No** for Paid Tier).
+>
+> If you are processing anything confidential — client accounts, contracts,
+> unpublished filings, personal data — **enable billing and use a paid-tier
+> key**. Paid usage of the models listed above is inexpensive: a typical
+> 15-page annual report costs a fraction of a penny on `gemini-3.1-flash-lite`.
+> The in-app cost estimator shows you the figure before you commit.
+
+Free-tier keys also carry per-minute and per-day rate limits, which this tool
+will hit on large batches. You can review yours at
+[aistudio.google.com/rate-limit](https://aistudio.google.com/rate-limit).
+
+#### Option 2 — Google Cloud Console (for existing Cloud users)
+
+If you already have a Google Cloud project with billing configured, create the
+key at
+[console.cloud.google.com/agent-platform/studio/settings/api-keys](https://console.cloud.google.com/agent-platform/studio/settings/api-keys).
+Keys made against a billed project are paid-tier from the start, so the training
+caveat above does not apply.
+
+#### Keeping the key safe
+
+Put the key in `.env`, which is gitignored — never paste it into source files or
+commit it. If you think a key has leaked, revoke it immediately from the same
+page you created it on.
+
+### 1. Clone and configure
+
+```bash
+git clone https://github.com/CleverLittleGoose/GooseQuill.git
+cd GooseQuill
+cp .env.example .env
+```
+
+Then open `.env` and add your key:
+
+```env
+PDF_MARKDOWN_KEY=your_gemini_api_key_here
+```
+
+*(`GEMINI_API_KEY` and `GOOGLE_API_KEY` are also accepted.)*
+
+### 2. Launch
+
+```bash
+./launch.sh
+```
+
+On first run this creates a virtual environment, installs dependencies, starts
+the server, and opens http://localhost:8000 in your browser. Subsequent runs
+skip straight to launching.
+
+Drop your PDFs into the `documents/` folder — or use the in-app uploader, or
+point the app at any folder on your machine from **Settings → Working Directory**.
+
+### Notes on privacy and security
+
+**Your documents are sent to Google's Gemini API** — that is how GooseQuill reads
+them. Nothing else leaves your machine, there is no telemetry, and we never see
+anything you process. [PRIVACY.md](PRIVACY.md) sets out exactly what is sent
+where, and why the free-tier/paid-tier choice above matters.
+
+### A note on security
+
+This tool is **local-first and single-user**. The API has no authentication and
+can read and write files in your documents folder, so the server binds to
+`127.0.0.1` only. Please read [SECURITY.md](SECURITY.md) before changing that.
+
+---
+
+## Testing & Developer Guide
+
+### Running the Test Suite
+
+Run the automated test runner script directly from the project root:
+```bash
+./test.sh
+```
+
+Or activate the virtual environment and run standard `unittest` or `pytest`:
+```bash
+source venv/bin/activate
+
+# Standard library unittest
+python -m unittest discover tests
+
+# Pytest (if installed)
+pytest tests
+```
+
+The suite is hermetic — it makes no network calls, so it runs offline and in CI.
+
+There is one opt-in exception. Google occasionally changes the format of its
+published pricing document, which would silently break the **Sync Pricing**
+feature. This check catches that, and is skipped unless you ask for it:
+
+```bash
+GOOSEQUILL_LIVE_TESTS=1 python -m unittest discover tests
+```
+
+A failure there means *upstream changed*, not that your commit is broken — see
+[`tests/test_pricing_live.py`](tests/test_pricing_live.py).
+
+---
+
+## Standalone CLI Usage
+
+### 1. Batch Document Conversion
+
+```bash
+source venv/bin/activate
+
+# Convert all discovered PDFs with default gemini-3.1-flash-lite
+python convert_reports_to_markdown.py
+
+# Convert with Gemini 3.7 Flash
+python convert_reports_to_markdown.py --model gemini-3.7-flash
+
+# Convert a single PDF file
+python convert_reports_to_markdown.py --file "documents/Annual Report 2024.pdf"
+
+# Test run on the first 3 pages only
+python convert_reports_to_markdown.py --limit-pages 3
+```
+
+### 2. Markdown Consolidation & Combining
+
+```bash
+source venv/bin/activate
+
+# Combine all converted markdowns in a company folder in chronological order with Table of Contents
+python combine_markdown.py --folder "Acme Corporation" --output "Acme_Consolidated.md"
+
+# Combine specific markdown or PDF files
+python combine_markdown.py --files "Report 2019.md" "Report 2020.md" "Report 2021.md" --output "Consolidated_2019-2021.md"
+
+# Combine all converted markdowns across all folders in workspace
+python combine_markdown.py --all --output "All_Documents_Master.md"
+```
+
+---
+
+## Output Structure
+
+Converted markdown files are saved directly in a `Markdown/` subfolder alongside the original PDF:
+- `<document_folder>/Markdown/<pdf_name>.md`
+- Consolidated outputs: `<document_folder>/Markdown/<combined_name>.md`
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome. Please run the test suite before opening a
+PR:
+
+```bash
+./test.sh
+```
+
+---
+
+## Licence
+
+Licensed under the [Apache License 2.0](LICENSE).
+
+Copyright 2026 Clever Little Goose LLC.
+
+This project bundles third-party components (marked, DOMPurify, Inter and
+JetBrains Mono) which remain under their own licences — see
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+Every dependency is permissively licensed — there is no copyleft anywhere in
+the stack — so you can use GooseQuill commercially and in closed-source work.

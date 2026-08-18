@@ -1,0 +1,26 @@
+# Secrets — never commit
+.env
+.env.local
+.streamlit/secrets.toml
+
+# Your documents and generated output
+Accounts/
+documents/*
+!documents/.gitkeep
+.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

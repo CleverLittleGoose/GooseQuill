@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GooseQuill | Gemini OCR & Document Intelligence</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.ico">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/vendor/purify.min.js"></script>
+  <script src="/vendor/marked.min.js"></script>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Top Navigation Header -->
+    <header class="top-nav">
+      <div class="nav-left">
+        <div class="brand">
+          <div class="brand-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <h1 class="brand-title">GooseQuill</h1>
+          </div>
+        </div>
+
+        <!-- Studio Navigation Switcher -->
+        <nav class="studio-nav" aria-label="Main Studio Navigation">
+          <button class="studio-tab-btn active" id="tabNavWorkspace" data-view="workspace">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span>Workspace</span>
+          </button>
+          <button class="studio-tab-btn" id="tabNavCombiner" data-view="combiner">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+              <line x1="8" y1="12" x2="16" y2="12"></line>
+              <line x1="12" y1="8" x2="12" y2="16"></line>
+            </svg>
+            <span>Markdown Combiner</span>
+            <span class="tab-badge" id="topNavConvertedBadge" style="display: none;">0</span>
+          </button>
+          <button class="studio-tab-btn" id="tabNavBatches" data-view="batches">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+            <span>Overnight Batches</span>
+            <span class="tab-badge night" id="topNavBatchActiveBadge" style="display: none;">0</span>
+          </button>
+          <button class="studio-tab-btn" id="tabNavEconomics" data-view="economics">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="1" x2="12" y2="23"></line>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+            </svg>
+            <span>Economics</span>
+          </button>
+        </nav>
+      </div>
+
+      <div class="nav-right">
+        <!-- Interactive API status indicator -->
+        <button class="status-pill active" id="apiStatusPill" title="Click to test API connection & view details">
+          <span class="pulse-dot" id="statusDot"></span>
+          <span id="apiStatusText">gemini-3.1-flash-lite</span>
+        </button>
+
+        <button class="btn btn-primary btn-upload-top" id="openUploadModalBtn" title="Upload new PDF files into a folder">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          <span>Upload PDF</span>
+        </button>
+
+        <div class="nav-divider"></div>
+
+        <button class="btn btn-secondary btn-icon-only" id="toggleNotificationsBtn" title="Alerts & Sound Chimes">
+          <svg id="bellIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+        </button>
+
+        <button class="btn btn-secondary btn-icon-only" id="openLogsBtn" title="Diagnostics & Logs">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="4 17 10 11 4 5"></polyline>
+            <line x1="12" y1="19" x2="20" y2="19"></line>
+          </svg>
+          <span class="error-badge-count" id="errorCountBadge" style="display: none;">0</span>
+        </button>
+
+        <button class="btn btn-secondary btn-icon-only" id="openSettingsBtn" title="OCR Presets & Settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Toast Notifications Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Global API Error / Warning Alert Banner -->
+    <div class="api-alert-banner" id="apiAlertBanner" style="display: none;">
+      <div class="alert-content">
+        <div class="alert-icon-title">
+          <svg class="alert-svg-icon" id="alertIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <div>
+            <strong id="alertTitle">API Warning</strong>
+            <span class="alert-msg" id="alertMessage">Details here...</span>
+          </div>
+        </div>
+        <div class="alert-actions">
+          <button class="btn btn-sm btn-secondary" id="alertViewLogsBtn">View Diagnostics</button>
+          <button class="btn-close-alert" id="dismissAlertBtn">&times;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Global Progress Banner (shown when converting) -->
+    <div class="progress-banner" id="progressBanner" style="display: none;">
+      <div class="banner-content">
+        <div class="banner-info">
+          <span class="spinner"></span>
+          <div>
+            <strong id="bannerDocName">Processing Document...</strong>
+            <span class="banner-sub" id="bannerPageInfo">Page 0 of 0 (0%)</span>
+          </div>
+        </div>
+        <div class="banner-actions">
+          <span id="rateLimitWarningPill" class="warning-pill" style="display: none;">Rate Limit Retry Active</span>
+          <button class="btn btn-sm btn-danger" id="cancelJobBtn">Cancel Job</button>
+        </div>
+      </div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+      </div>
+    </div>
+
+    <!-- Main Views Container -->
+    <main class="main-body">
+      <!-- ========================================== -->
+      <!-- VIEW 1: WORKSPACE (DOCUMENTS & ENTITIES)  -->
+      <!-- ========================================== -->
+      <div class="studio-view active" id="viewWorkspace">
+        <div class="workspace-layout">
+          <!-- Left Sidebar: Corporate Entities / Folders -->
+          <aside class="sidebar entity-sidebar">
+            <div class="sidebar-top-header">
+              <div class="sidebar-title-row">
+                <span class="sidebar-heading">Entities & Folders</span>
+                <div class="header-actions-inline">
+                  <button class="btn-icon" id="newFolderBtn" title="Create new corporate entity folder">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                      <line x1="12" y1="11" x2="12" y2="17"></line>
+                      <line x1="9" y1="14" x2="15" y2="14"></line>
+                    </svg>
+                  </button>
+                  <button class="btn-icon" id="refreshBtn" title="Refresh files & folders">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M23 4v6h-6"></path>
+                      <path d="M1 20v-6h6"></path>
+                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="search-input-wrapper mt-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="folderSearchInput" class="search-input" placeholder="Filter entities..." spellcheck="false">
+              </div>
+            </div>
+
+            <!-- Full-Height Scrollable Entity List -->
+            <div class="entity-list-scroll">
+              <ul class="entity-list" id="folderList"></ul>
+            </div>
+
+            <!-- Sidebar Bottom Info Bar -->
+            <div class="sidebar-bottom-bar">
+              <div class="sidebar-stat-chip">
+                <span id="totalReportsCount">0</span> docs • <span id="convertedReportsCount">0</span> .md
+              </div>
+              <button class="btn-text-link" id="sidebarQuickUploadBtn">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                Upload to folder
+              </button>
+            </div>
+          </aside>
+
+          <!-- Right Content Panel: Document Data Table & Actions -->
+          <section class="content-panel">
+            <!-- Context Header -->
+            <div class="panel-header">
+              <div class="panel-title-area">
+                <h2 class="folder-main-title" id="activeFolderTitle">All Documents</h2>
+                <div class="folder-stats-summary" id="activeFolderSubtitle">
+                  Loading filings and workspace metrics...
+                </div>
+              </div>
+              <div class="panel-actions">
+                <button class="btn btn-secondary btn-md" id="combineFolderBtn" style="display: none;" title="Consolidate converted markdown files in this entity">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                  </svg>
+                  Combine Converted (<span id="folderConvertedCount">0</span>)
+                </button>
+                <button class="btn btn-accent btn-md" id="convertScopeBtn" title="Run OCR conversion on unconverted documents in active view">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                  </svg>
+                  Convert Folder (<span id="scopeDocCount">0</span>)
+                </button>
+                <button class="btn btn-outline-night btn-md" id="submitOvernightBatchBtn" title="Submit folder as an asynchronous Gemini Batch Job with 50% discount">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                  </svg>
+                  Overnight (50% Off)
+                </button>
+              </div>
+            </div>
+
+            <!-- Table Controls: Status Filter Tabs, Search & Sort -->
+            <div class="table-toolbar">
+              <div class="filter-tabs-group" role="tablist">
+                <button class="filter-tab-btn active" data-filter="all" id="filterTabAll">
+                  All <span class="filter-count" id="countFilterAll">0</span>
+                </button>
+                <button class="filter-tab-btn" data-filter="ready" id="filterTabReady">
+                  Needs OCR <span class="filter-count ready-pill" id="countFilterReady">0</span>
+                </button>
+                <button class="filter-tab-btn" data-filter="converted" id="filterTabConverted">
+                  Converted <span class="filter-count converted-pill" id="countFilterConverted">0</span>
+                </button>
+                <button class="filter-tab-btn" data-filter="batch" id="filterTabBatch">
+                  In Batch <span class="filter-count batch-pill" id="countFilterBatch">0</span>
+                </button>
+              </div>
+
+              <div class="toolbar-controls-right">
+                <div class="search-input-wrapper table-search">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <input type="text" id="documentSearchInput" class="search-input" placeholder="Search filings in view..." spellcheck="false">
+                </div>
+
+                <select id="documentSortSelect" class="form-select form-select-sm sort-select">
+                  <option value="year_desc">Year (Newest &rarr; Oldest)</option>
+                  <option value="year_asc">Year (Oldest &rarr; Newest)</option>
+                  <option value="name_asc">Filing Name (A &rarr; Z)</option>
+                  <option value="pages_desc">Pages (High &rarr; Low)</option>
+                  <option value="size_desc">File Size (Large &rarr; Small)</option>
+                </select>
+
+                <div class="selection-action-btns">
+                  <button class="btn btn-sm btn-secondary" id="selectAllBtn">Select All</button>
+                  <button class="btn btn-sm btn-secondary" id="deselectAllBtn">Deselect</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Documents Data Table -->
+            <div class="data-table-container">
+              <table class="documents-table" id="documentsTable">
+                <thead>
+                  <tr>
+                    <th style="width: 40px; text-align: center;">
+                      <input type="checkbox" id="masterTableCheckbox" class="doc-chk" title="Toggle all in current filter">
+                    </th>
+                    <th>Document / Filing Name</th>
+                    <th style="width: 110px;">Period / Year</th>
+                    <th style="width: 130px;">Pages & Size</th>
+                    <th style="width: 140px;">Status</th>
+                    <th style="width: 140px; text-align: right;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="documentsTableBody">
+                  <tr>
+                    <td colspan="6" class="text-center" style="padding: 60px;">
+                      <div class="spinner-lg"></div>
+                      <p class="text-muted mt-2">Connecting to Gemini & Discovering PDF filings...</p>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Floating Multi-Selection Action Dock -->
+            <div class="floating-selection-bar" id="floatingSelectionBar" style="display: none;">
+              <div class="selection-info">
+                <span class="selection-badge" id="floatingSelectedCount">0</span>
+                <span class="selection-text">Filings Selected</span>
+              </div>
+              <div class="selection-actions">
+                <button class="btn btn-sm btn-primary" id="convertSelectedBtn">
+                  Convert Selected
+                </button>
+                <button class="btn btn-sm btn-outline-night" id="floatingBatchBtn" title="Submit selected documents as an overnight batch job (50% discount)">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                  </svg>
+                  Overnight (50% Off)
+                </button>
+                <button class="btn btn-sm btn-secondary" id="combineSelectedBtn" style="display: none;" title="Consolidate selected converted markdown files">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                  </svg>
+                  Combine (<span id="combineSelectedCount">0</span>)
+                </button>
+                <button class="btn-clear-selection" id="floatingClearSelectionBtn" title="Clear selection">
+                  &times;
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+      <!-- ========================================== -->
+      <!-- VIEW 2: MARKDOWN COMBINER STUDIO           -->
+      <!-- ========================================== -->
+      <div class="studio-view" id="viewCombiner" style="display: none;">
+        <div class="combiner-studio-layout">
+          <!-- Left: Full-Height Document Selector & Sequence Manager -->
+          <div class="combiner-sidebar-studio">
+            <div class="combiner-studio-header">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 class="studio-pane-title">Document Sequence</h3>
+                <span id="studioCombinerSelectedCountBadge" class="tab-badge" style="font-size: 13px;">0 Selected</span>
+              </div>
+
+              <!-- Source Folder Selector -->
+              <div class="combiner-source-filter-box mt-2">
+                <label class="text-xs text-muted" for="studioCombinerSourceFolderSelect" style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                  <span>Source Folder / Entity:</span>
+                  <span id="studioCombinerSourceSummary" class="text-accent">377 converted</span>
+                </label>
+                <select id="studioCombinerSourceFolderSelect" class="form-select form-select-sm"></select>
+              </div>
+
+              <!-- Instant Search in Combiner -->
+              <div class="search-input-wrapper mt-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="studioCombinerSearchInput" class="search-input" placeholder="Filter documents in sequence..." spellcheck="false">
+              </div>
+
+              <!-- Quick Selection & Sort Controls -->
+              <div class="combiner-controls-row mt-2">
+                <div class="combiner-quick-actions">
+                  <button class="btn btn-xs btn-secondary" id="studioCombinerSelectFolderBtn">Select Entity</button>
+                  <button class="btn btn-xs btn-secondary" id="studioCombinerSelectAllBtn">Select All</button>
+                  <button class="btn btn-xs btn-secondary" id="studioCombinerDeselectBtn">Clear</button>
+                </div>
+
+                <div class="combiner-sort-bar">
+                  <button class="btn btn-xs btn-secondary" id="studioCombinerSortChronoAscBtn" title="Sort chronologically by year ascending (Oldest to Newest)">📅 Year &uarr;</button>
+                  <button class="btn btn-xs btn-secondary" id="studioCombinerSortChronoDescBtn" title="Sort chronologically by year descending (Newest to Oldest)">📅 Year &darr;</button>
+                  <button class="btn btn-xs btn-secondary" id="studioCombinerSortAlphaBtn" title="Sort alphabetically A to Z">🔤 A-Z</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Notice Banner -->
+            <div class="combiner-folder-notice" id="studioCombinerFolderNotice" style="display: none;"></div>
+
+            <!-- Full-Height Scrollable File List -->
+            <div class="combiner-file-list" id="studioCombinerFileList">
+              <div class="text-muted text-center" style="padding: 40px;">Loading converted documents...</div>
+            </div>
+          </div>
+
+          <!-- Right: Live Consolidated Preview & Configuration -->
+          <div class="combiner-preview-panel">
+            <!-- Top Configuration Bar: Title, Filename, Destination, and Feature Toggles -->
+            <div class="combiner-config-header">
+              <div class="combiner-config-row">
+                <div class="form-group mb-0" style="flex: 2;">
+                  <label class="text-xs text-muted" for="studioCombinerMasterTitleInput">Master Document Title</label>
+                  <input type="text" id="studioCombinerMasterTitleInput" class="form-input form-input-sm" placeholder="Consolidated Document Title">
+                </div>
+                <div class="form-group mb-0" style="flex: 1.2;">
+                  <label class="text-xs text-muted" for="studioCombinerOutputFilenameInput">Output File Name</label>
+                  <input type="text" id="studioCombinerOutputFilenameInput" class="form-input form-input-sm" placeholder="Consolidated_Document.md">
+                </div>
+                <div class="form-group mb-0" style="flex: 1.2;">
+                  <label class="text-xs text-muted" for="studioCombinerTargetFolderSelect">Save Destination</label>
+                  <select id="studioCombinerTargetFolderSelect" class="form-select form-select-sm"></select>
+                </div>
+              </div>
+
+              <!-- Inline Toggle Pills -->
+              <div class="combiner-toggles-bar mt-2">
+                <label class="checkbox-pill">
+                  <input type="checkbox" id="studioCombinerIncludeToc" checked>
+                  <span>📋 Interactive Table of Contents</span>
+                </label>
+                <label class="checkbox-pill">
+                  <input type="checkbox" id="studioCombinerIncludeSourceMeta" checked>
+                  <span>📄 Source Metadata Banners</span>
+                </label>
+                <label class="checkbox-pill">
+                  <input type="checkbox" id="studioCombinerStripHeaders" checked>
+                  <span>✨ Clean Duplicate Headers</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Preview Header & Stats Sub-Bar -->
+            <div class="combiner-preview-header">
+              <div class="tab-group" id="studioCombinerPreviewTabs">
+                <button class="tab-btn active" data-tab="rendered">Rendered Preview</button>
+                <button class="tab-btn" data-tab="raw">Raw Markdown</button>
+              </div>
+
+              <div class="combiner-stats-bar">
+                <span class="stat-pill"><strong id="studioCombinerStatDocs">0</strong> Docs</span>
+                <span class="stat-pill"><strong id="studioCombinerStatPages">0</strong> Pages</span>
+                <span class="stat-pill"><strong id="studioCombinerStatWords">0</strong> Words</span>
+                <span class="stat-pill"><strong id="studioCombinerStatChars">0</strong> Chars</span>
+              </div>
+            </div>
+
+            <!-- Live Preview Body Area -->
+            <div class="combiner-preview-body">
+              <div class="combiner-view-panel active" id="studioCombinerTabRendered">
+                <div class="markdown-preview prose" id="studioCombinerRenderedContent">
+                  <div class="text-muted text-center" style="padding: 60px;">Select converted documents on the left to preview consolidated markdown.</div>
+                </div>
+              </div>
+
+              <div class="combiner-view-panel" id="studioCombinerTabRaw">
+                <div class="raw-editor-wrapper" style="height: 100%;">
+                  <textarea id="studioCombinerRawMarkdownTextarea" class="code-editor" spellcheck="false" placeholder="Consolidated markdown will appear here..."></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer Actions Bar -->
+            <div class="combiner-footer">
+              <div class="combiner-footer-info" id="studioCombinerSaveDestinationText">Destination: /Accounts/Consolidated_Document.md</div>
+              <div class="combiner-footer-actions">
+                <button class="btn btn-secondary btn-md" id="studioCombinerCopyBtn" title="Copy raw markdown to clipboard">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  Copy Markdown
+                </button>
+                <button class="btn btn-secondary btn-md" id="studioCombinerDownloadBtn" title="Download consolidated markdown file">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  Download .md
+                </button>
+                <button class="btn btn-primary btn-md" id="studioCombinerSaveBtn" title="Save consolidated markdown directly to disk">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                  </svg>
+                  Save to Workspace
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- VIEW 3: OVERNIGHT BATCHES                  -->
+      <!-- ========================================== -->
+      <div class="studio-view" id="viewBatches" style="display: none;">
+        <div class="standalone-panel">
+          <div class="standalone-header">
+            <div>
+              <h2 class="section-hero-title">🌙 Gemini Batch API (Overnight Processing)</h2>
+              <p class="text-muted mt-1">Submit large document batches to run asynchronously with a <strong>50% token discount</strong>. Jobs complete overnight within 24 hours.</p>
+            </div>
+            <button class="btn btn-secondary btn-md" id="refreshBatchJobsStandaloneBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 4v6h-6"></path>
+                <path d="M1 20v-6h6"></path>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+              Refresh Jobs
+            </button>
+          </div>
+
+          <div class="batch-jobs-card-list" id="batchJobsStandaloneList">
+            <div class="text-muted text-center" style="padding: 40px;">Checking active batch jobs...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- VIEW 4: TOKEN ECONOMICS & COST TRANSPARENCY-->
+      <!-- ========================================== -->
+      <div class="studio-view" id="viewEconomics" style="display: none;">
+        <div class="standalone-panel">
+          <div class="standalone-header">
+            <div>
+              <h2 class="section-hero-title">💰 Token Economics & Pricing Transparency</h2>
+              <p class="text-muted mt-1">Transparent rate cards and live cost calculator based on your exact workspace filings.</p>
+            </div>
+          </div>
+
+          <div class="economics-grid">
+            <!-- Rate Card -->
+            <div class="economics-card">
+              <div class="card-header-flex">
+                <h3 class="card-title">Official Google Gemini Rate Card</h3>
+                <div class="pricing-actions">
+                  <button class="btn btn-outline-night btn-sm" id="econSyncPricingBtn" title="Sync live rates from Google AI Docs">
+                    <span id="econSyncSpinner" class="sync-icon">🔄</span> Sync Latest Rates
+                  </button>
+                </div>
+              </div>
+              <p class="pricing-notice-text mt-1">
+                Rates per 1M tokens in USD. Reference: <a href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank" rel="noopener noreferrer">Google AI Pricing Documentation ↗</a> (check for current tier updates).
+              </p>
+              <table class="pricing-table mt-2">
+                <thead>
+                  <tr>
+                    <th>Model</th>
+                    <th>Standard Input</th>
+                    <th>Standard Output</th>
+                    <th>Overnight Batch (50% Off)</th>
+                  </tr>
+                </thead>
+                <tbody id="rateCardTableBody">
+                  <tr class="highlight-row">
+                    <td><strong>Gemini 3.1 Flash-Lite</strong> <span class="badge-tag default">Default</span></td>
+                    <td>$0.25 / M tokens</td>
+                    <td>$1.50 / M tokens</td>
+                    <td><strong class="text-night">$0.125 / $0.75</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 3.5 Flash-Lite</strong> <span class="badge-tag">Economy</span></td>
+                    <td>$0.30 / M tokens</td>
+                    <td>$2.50 / M tokens</td>
+                    <td><strong class="text-night">$0.15 / $1.25</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 3.7 Flash</strong> <span class="badge-tag frontier">Frontier</span></td>
+                    <td>$0.75 / M tokens</td>
+                    <td>$3.75 / M tokens</td>
+                    <td><strong class="text-night">$0.375 / $1.875</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 3.6 Flash</strong></td>
+                    <td>$0.75 / M tokens</td>
+                    <td>$3.75 / M tokens</td>
+                    <td><strong class="text-night">$0.375 / $1.875</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 3.5 Flash</strong></td>
+                    <td>$1.50 / M tokens</td>
+                    <td>$9.00 / M tokens</td>
+                    <td><strong class="text-night">$0.75 / $4.50</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 3 Flash Preview</strong></td>
+                    <td>$0.50 / M tokens</td>
+                    <td>$3.00 / M tokens</td>
+                    <td><strong class="text-night">$0.25 / $1.50</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 3.1 Pro Preview</strong> <span class="badge-tag pro">Pro</span></td>
+                    <td>$2.00 / M tokens</td>
+                    <td>$12.00 / M tokens</td>
+                    <td><strong class="text-night">$1.00 / $6.00</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 2.5 Pro</strong> <span class="badge-tag pro">Pro</span></td>
+                    <td>$1.25 / M tokens</td>
+                    <td>$10.00 / M tokens</td>
+                    <td><strong class="text-night">$0.625 / $5.00</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 2.5 Flash</strong></td>
+                    <td>$0.30 / M tokens</td>
+                    <td>$2.50 / M tokens</td>
+                    <td><strong class="text-night">$0.15 / $1.25</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 2.5 Flash-Lite</strong></td>
+                    <td>$0.10 / M tokens</td>
+                    <td>$0.40 / M tokens</td>
+                    <td><strong class="text-night">$0.05 / $0.20</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Workspace Cost Estimate Breakdown -->
+            <div class="economics-card">
+              <h3 class="card-title">Your Workspace Cost Breakdown</h3>
+              <div class="cost-stat-pills mt-3">
+                <div class="cost-stat-box">
+                  <span class="cost-box-label">Total Documents</span>
+                  <strong class="cost-box-num" id="econTotalDocs">0</strong>
+                </div>
+                <div class="cost-stat-box">
+                  <span class="cost-box-label">Total Pages</span>
+                  <strong class="cost-box-num" id="econTotalPages">0</strong>
+                </div>
+                <div class="cost-stat-box">
+                  <span class="cost-box-label">Standard Est. Cost</span>
+                  <strong class="cost-box-num text-success" id="econStandardCost">$0.00</strong>
+                </div>
+                <div class="cost-stat-box">
+                  <span class="cost-box-label">Overnight Batch Est.</span>
+                  <strong class="cost-box-num text-night" id="econBatchCost">$0.00</strong>
+                </div>
+              </div>
+              <div class="formula-box mt-3">
+                <strong>Calculation Method:</strong> 1 PDF page contains ~400 input prompt tokens + generates ~850 output markdown tokens (~1,250 tokens per page).
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: DEDICATED ACCESSIBLE UPLOAD MODAL   -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="uploadModal" style="display: none;">
+    <div class="modal-dialog modal-md">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          <h3>Upload PDF Filings</h3>
+        </div>
+        <button class="btn-close" id="closeUploadModalBtn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group mb-3">
+          <label for="uploadTargetFolderSelect">Destination Corporate Entity / Folder</label>
+          <select id="uploadTargetFolderSelect" class="form-select form-select-md"></select>
+        </div>
+
+        <div class="dropzone-large" id="dropZone">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          <h4>Drag and drop PDF filings here</h4>
+          <p class="text-muted text-sm mt-1">or <strong style="color: var(--primary-color);">browse files from your computer</strong></p>
+          <input type="file" id="fileInput" accept=".pdf" multiple style="display: none;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: DOCUMENT VIEWER (SPLIT VIEW)        -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="viewerModal" style="display: none;">
+    <div class="modal-dialog modal-fullscreen">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+          <div>
+            <h3 id="viewerDocTitle">Document Name</h3>
+            <span class="text-xs text-muted" id="viewerDocMeta">Pages • Size</span>
+          </div>
+        </div>
+        <div class="modal-header-actions">
+          <button class="btn btn-sm btn-secondary" id="viewerTogglePdfBtn">Toggle PDF Split</button>
+          <button class="btn btn-sm btn-secondary" id="viewerCopyBtn">Copy Markdown</button>
+          <button class="btn btn-sm btn-primary" id="viewerDownloadBtn">Download .md</button>
+          <button class="btn-close" id="closeViewerBtn">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body viewer-body">
+        <div class="viewer-split-container" id="viewerSplitContainer">
+          <div class="viewer-pane markdown-pane" id="viewerMarkdownPane">
+            <div class="markdown-preview prose" id="viewerMarkdownContent"></div>
+          </div>
+          <div class="viewer-pane pdf-pane" id="viewerPdfPane" style="display: none;">
+            <div class="pdf-controls-bar">
+              <button class="btn btn-xs btn-secondary" id="pdfPrevPageBtn">&larr; Prev</button>
+              <span class="text-xs" id="pdfPageIndicator">Page 1 of 1</span>
+              <button class="btn btn-xs btn-secondary" id="pdfNextPageBtn">Next &rarr;</button>
+            </div>
+            <div class="pdf-render-canvas-wrapper" id="pdfCanvasWrapper">
+              <img id="pdfPageImage" alt="PDF Page Preview">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: SETTINGS & CONFIGURATION            -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="settingsModal" style="display: none;">
+    <div class="modal-dialog modal-md">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <h3>Settings & OCR Configuration</h3>
+        </div>
+        <button class="btn-close" id="closeSettingsBtn">&times;</button>
+      </div>
+      <div class="modal-body settings-body">
+        <div class="form-group mb-3">
+          <div class="label-with-action">
+            <label for="modelSelect">Gemini Vision Model</label>
+            <button type="button" class="btn-text-action" id="settingsSyncPricingBtn" title="Fetch latest model rates from Google Docs">
+              <span id="settingsSyncSpinner">🔄</span> Sync Rates
+            </button>
+          </div>
+          <select id="modelSelect" class="form-select">
+            <optgroup label="Gemini 3.x Models (Latest Generation)">
+              <option value="gemini-3.1-flash-lite" selected>Gemini 3.1 Flash-Lite (Default — $0.25 in / $1.50 out · Ultra Low Cost & High Speed)</option>
+              <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite ($0.30 in / $2.50 out · Cost-Efficient GA)</option>
+              <option value="gemini-3.7-flash">Gemini 3.7 Flash ($0.75 in / $3.75 out · Flagship Hybrid Reasoning & Multimodal)</option>
+              <option value="gemini-3.6-flash">Gemini 3.6 Flash ($0.75 in / $3.75 out · High Speed Frontier Intelligence)</option>
+              <option value="gemini-3.5-flash">Gemini 3.5 Flash ($1.50 in / $9.00 out · Balanced Speed & Intelligence)</option>
+              <option value="gemini-3-flash-preview">Gemini 3 Flash Preview ($0.50 in / $3.00 out · Preview Flash)</option>
+              <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview ($2.00 in / $12.00 out · Frontier Multimodal Understanding)</option>
+            </optgroup>
+            <optgroup label="Gemini 2.5 Models">
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro ($1.25 in / $10.00 out · Complex Layouts & Deep Reasoning)</option>
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash ($0.30 in / $2.50 out · Hybrid Reasoning)</option>
+              <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite ($0.10 in / $0.40 out · At-Scale Scaling)</option>
+            </optgroup>
+          </select>
+
+          <!-- Dynamic Live Model Specification Detail Card -->
+          <div class="model-spec-card mt-2" id="modelSpecsCard">
+            <div class="model-spec-header">
+              <div class="model-spec-title-group">
+                <strong id="specModelName">Gemini 3.1 Flash-Lite</strong>
+                <span class="model-badge" id="specModelTier">Default / Economy</span>
+              </div>
+              <span class="model-context-badge" id="specModelContext">Context: 1M tokens</span>
+            </div>
+            <p class="model-spec-desc" id="specModelDesc">Our most cost-efficient model, optimized for high-volume agentic tasks, translation, and simple data processing.</p>
+            <div class="model-spec-grid">
+              <div class="spec-stat">
+                <span class="spec-stat-label">Standard Input</span>
+                <strong class="spec-stat-val" id="specStdInput">$0.25 / 1M</strong>
+              </div>
+              <div class="spec-stat">
+                <span class="spec-stat-label">Standard Output</span>
+                <strong class="spec-stat-val" id="specStdOutput">$1.50 / 1M</strong>
+              </div>
+              <div class="spec-stat">
+                <span class="spec-stat-label">Overnight Batch</span>
+                <strong class="spec-stat-val highlight" id="specBatchRate">$0.125 / $0.75 (50% Off)</strong>
+              </div>
+              <div class="spec-stat">
+                <span class="spec-stat-label">Context Cache</span>
+                <strong class="spec-stat-val" id="specCacheRate">$0.025 / 1M</strong>
+              </div>
+            </div>
+            <div class="model-spec-footer">
+              <span class="spec-rec-label">💡 Best For:</span>
+              <span class="spec-rec-text" id="specModelRec">Default / Recommended — Ultra Low Cost & High Speed OCR</span>
+            </div>
+          </div>
+
+          <div class="pricing-doc-link-container mt-2">
+            <span class="pricing-doc-link-text">
+              Official rates from Google: <a href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank" rel="noopener noreferrer">ai.google.dev/pricing ↗</a> (check for the latest tier info)
+            </span>
+          </div>
+        </div>
+
+        <div class="form-group mb-3">
+          <label for="concurrencySelect">Parallel Workers (Concurrency)</label>
+          <select id="concurrencySelect" class="form-select">
+            <option value="1">1 Worker (Safe Rate-Limit)</option>
+            <option value="3">3 Workers</option>
+            <option value="5" selected>5 Workers (Default)</option>
+            <option value="8">8 Workers (High Speed)</option>
+          </select>
+        </div>
+
+        <div class="form-group mb-3">
+          <label>OCR Prompt Presets</label>
+          <div class="preset-pill-group">
+            <button class="preset-pill active" data-preset="financial">Financial & Filings</button>
+            <button class="preset-pill" data-preset="standard">Standard Document</button>
+            <button class="preset-pill" data-preset="academic">Academic & Technical</button>
+            <button class="preset-pill" data-preset="legal">Legal & Contracts</button>
+          </div>
+          <textarea id="systemPromptTextarea" class="form-textarea mt-2" rows="4"></textarea>
+        </div>
+
+        <div class="form-group mb-2">
+          <label class="checkbox-row">
+            <input type="checkbox" id="forceReprocessCheckbox">
+            <span>Force Reprocess (Bypass Cached OCR Pages)</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="saveSettingsBtn">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: DIAGNOSTICS & LOGS                  -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="logsModal" style="display: none;">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="4 17 10 11 4 5"></polyline>
+            <line x1="12" y1="19" x2="20" y2="19"></line>
+          </svg>
+          <h3>Diagnostics & Execution Logs</h3>
+        </div>
+        <div class="modal-header-actions">
+          <button class="btn btn-sm btn-secondary" id="modalTestApiBtn">Test API Connection</button>
+          <button class="btn btn-sm btn-secondary" id="clearLogsBtn">Clear</button>
+          <button class="btn-close" id="closeLogsBtn">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="console-box" id="liveLogsConsole"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: CREATE NEW ENTITY FOLDER            -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="newFolderModal" style="display: none;">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-header">
+        <h3>Create New Entity Folder</h3>
+        <button class="btn-close" id="closeNewFolderBtn">&times;</button>
+      </div>
+      <div class="modal-body settings-body">
+        <div class="form-group">
+          <label for="newFolderNameInput">Entity / Company Name</label>
+          <input type="text" id="newFolderNameInput" class="form-input" placeholder="e.g. Annual Reports, Contracts, Research Papers">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="confirmCreateFolderBtn">Create Entity</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
