@@ -21,6 +21,7 @@ from goosequill.models import (
 )
 
 PRICING = PricingRegistry.get_all_raw()
+from goosequill.services.genai_factory import describe_backend
 from goosequill.services import (
     PDFRenderer,
     CacheManager,
@@ -228,14 +229,35 @@ def test_connection(model: str = "gemini-3.1-flash-lite"):
     """Test API credentials and connectivity."""
     try:
         client = GeminiOCRClient(model_name=model)
-        return client.test_connection()
+        result = client.test_connection()
+        # Which backend answered matters as much as whether it answered: it is
+        # the difference between documents staying in a region you chose and
+        # going to a global endpoint.
+        result["backend"] = client.backend.to_dict()
+        return result
     except Exception as e:
         return {
             "status": "error",
             "error_type": "INIT_ERROR",
             "model": model,
-            "message": str(e)
+            "message": str(e),
+            "backend": backend_info()
         }
+
+
+def backend_info() -> Dict[str, Any]:
+    """Describe the configured backend. Defined in the service layer so the
+    web layer cannot drift from it."""
+    try:
+        return describe_backend()
+    except Exception:
+        return {"backend": "unknown", "label": "unknown", "region_pinned": False}
+
+
+@app.get("/api/backend")
+def get_backend():
+    """Report which Gemini backend is configured, and whether it is region-pinned."""
+    return backend_info()
 
 @app.get("/api/documents")
 def get_documents(model: str = "gemini-3.1-flash-lite"):
@@ -440,6 +462,12 @@ def create_batch_job(req: BatchCreateRequest):
         return {"status": "submitted", "job": job}
     except HTTPException:
         raise
+    except ValueError as e:
+        # Unsupported backend or bad configuration: the caller can fix this, so
+        # it is a 400. A 500 would suggest GooseQuill had broken.
+        job_state.error = str(e)
+        job_state.add_error("Batch", None, str(e))
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("Batch creation error")
         job_state.error = str(e)
@@ -457,6 +485,8 @@ def collect_batch_results(req: BatchCollectRequest):
         return result
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("Batch collect error")
         raise HTTPException(status_code=500, detail=str(e))

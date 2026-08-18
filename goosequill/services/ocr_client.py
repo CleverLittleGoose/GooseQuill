@@ -5,6 +5,7 @@ import logging
 from typing import Optional, Callable, Dict, Any, List
 from dotenv import load_dotenv
 from google import genai
+from .genai_factory import build_client, resolve_api_key
 from ..models.document import DEFAULT_SYSTEM_PROMPT, RECITATION_FALLBACK_PROMPTS
 
 logger = logging.getLogger(__name__)
@@ -19,11 +20,10 @@ class GeminiOCRClient:
         system_prompt: Optional[str] = None
     ):
         load_dotenv()
-        self.api_key = api_key or os.environ.get("PDF_MARKDOWN_KEY") or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        if not self.api_key:
-            raise ValueError("No Gemini API key found. Please set PDF_MARKDOWN_KEY, GEMINI_API_KEY, or GOOGLE_API_KEY in .env or environment.")
-
-        self.client = genai.Client(api_key=self.api_key)
+        # Backend choice (Gemini API vs Vertex AI) and credential handling live
+        # in one place; this class only needs the client that comes back.
+        self.client, self.backend = build_client(api_key)
+        self.api_key = None if self.backend.vertex else resolve_api_key(api_key)
         self.model_name = model_name
         self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
 

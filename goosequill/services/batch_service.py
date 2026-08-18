@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Callable
 from dotenv import load_dotenv
 from google import genai
+from .genai_factory import build_client, resolve_api_key
 from google.genai import types
 
 from ..models.job import BatchJobRecord
@@ -17,7 +18,25 @@ from .markdown_assembler import MarkdownAssembler
 logger = logging.getLogger(__name__)
 
 class BatchService:
-    """Encapsulates Gemini File API and Batch API submission, status tracking, and result aggregation."""
+    """Encapsulates Gemini File API and Batch API submission, status tracking, and result aggregation.
+
+    Batch jobs are Gemini Developer API only. The batch flow uploads a JSONL
+    payload through the File API, and that API raises on Vertex AI, where batch
+    input has to be staged in Cloud Storage instead. Rather than let an SDK
+    error surface halfway through preparing a payload, every batch entry point
+    checks the backend first — see _require_batch_support.
+    """
+
+    BATCH_UNSUPPORTED_ON_VERTEX = (
+        "Batch jobs are not available on Vertex AI. The batch flow uploads its "
+        "payload through the Gemini File API, which Vertex does not offer — it "
+        "stages batch input in Cloud Storage instead, which GooseQuill does not "
+        "implement. Convert these documents normally instead (the cost is the "
+        "standard rate rather than the 50% batch rate), or switch to a Gemini "
+        "API key by removing GOOSEQUILL_USE_VERTEX from your .env. Note that "
+        "the Gemini API is a global endpoint, so switching gives up the regional "
+        "processing that Vertex is presumably why you chose it."
+    )
 
     def __init__(
         self,
@@ -27,11 +46,8 @@ class BatchService:
         markdown_assembler: Optional[MarkdownAssembler] = None
     ):
         load_dotenv()
-        self.api_key = api_key or os.environ.get("PDF_MARKDOWN_KEY") or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        if not self.api_key:
-            raise ValueError("No Gemini API key found.")
-
-        self.client = genai.Client(api_key=self.api_key)
+        self.client, self.backend = build_client(api_key)
+        self.api_key = None if self.backend.vertex else resolve_api_key(api_key)
         self.cache_manager = cache_manager or CacheManager()
         self.pdf_renderer = pdf_renderer or PDFRenderer()
         self.markdown_assembler = markdown_assembler or MarkdownAssembler()
@@ -58,6 +74,11 @@ class BatchService:
             json.dump(jobs, f, indent=2)
         self._cached_jobs = jobs
 
+    def _require_batch_support(self) -> None:
+        """Refuse batch work on a backend that cannot do it, before any work."""
+        if self.backend.vertex:
+            raise ValueError(self.BATCH_UNSUPPORTED_ON_VERTEX)
+
     def create_batch_job(
         self,
         pdf_paths: List[str],
@@ -67,6 +88,7 @@ class BatchService:
         progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None
     ) -> Dict[str, Any]:
         """Prepare JSONL for all pages across all selected PDFs and submit Batch API job with live progress."""
+        self._require_batch_support()
         timestamp_str = time.strftime("%Y%m%d_%H%M%S")
         job_id = f"batch_{timestamp_str}"
         disp_name = display_name or f"PDF_Markdown_Batch_{timestamp_str}"
@@ -249,6 +271,8 @@ class BatchService:
 
     def collect_job_results(self, job_id: str) -> Dict[str, Any]:
         """Download batch results and assemble final Markdown files."""
+        # Collecting reaches the same File API the submission used.
+        self._require_batch_support()
         jobs = self._load_jobs()
         target_job = next((j for j in jobs if j["id"] == job_id), None)
         if not target_job:

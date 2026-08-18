@@ -41,6 +41,14 @@ not process that document with GooseQuill.
 Your API key is sent with each request, because that is how the API
 authenticates you.
 
+**If you have configured Vertex AI**, that first destination changes: requests
+go to Google's EU multi-region residency endpoint
+(`aiplatform.eu.rep.googleapis.com`) instead, and your documents are processed
+inside the EEA. That is a configuration you have to switch on deliberately —
+the README explains how, and it takes three lines in `.env`. GooseQuill never
+falls back from it to the global endpoint; a broken Vertex configuration stops
+the job instead of quietly relocating your documents.
+
 **2. Google's published pricing document** (`ai.google.dev`), when you press
 **Sync Pricing**.
 
@@ -126,6 +134,12 @@ tends to warrant one — potentially a DPIA. **Do not use a free-tier key for
 anyone else's personal data.** The training permission is difficult to reconcile
 with most lawful bases, and impossible to reconcile with a duty of
 confidentiality.
+
+**If the transfer itself is your difficulty rather than the training**, the
+Vertex AI option above keeps processing inside the EEA, which removes the
+international transfer from the analysis entirely. It is the better answer for
+UK and EU practitioners handling client documents, and it is three lines of
+configuration.
 
 This paragraph is a signpost, not legal advice.
 

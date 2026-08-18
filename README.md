@@ -84,6 +84,46 @@ key at
 Keys made against a billed project are paid-tier from the start, so the training
 caveat above does not apply.
 
+#### Option 3 — Vertex AI, if your documents must stay in the EEA
+
+Options 1 and 2 both use the Gemini Developer API, which is a **global**
+endpoint: you get no say in which territory your documents are processed in.
+For client accounts, contracts or anything carrying other people's personal
+data, that may not be good enough.
+
+Vertex AI's **EU multi-region residency endpoint** fixes that. You need a
+Google Cloud project and an API key belonging to it — no service account, no
+`gcloud` login:
+
+```env
+GOOSEQUILL_USE_VERTEX=1
+GOOGLE_CLOUD_PROJECT=your-project-id
+VERTEX_API_KEY=your_project_scoped_key
+```
+
+That is the whole configuration. It defaults to
+`https://aiplatform.eu.rep.googleapis.com`, in the `eu` multi-region.
+
+**Two things that are easy to get wrong:**
+
+- **It must be the multi-region (`eu`), not a single region like
+  `europe-west4`.** Several Flash-Lite models are served in the US and EU
+  multi-regions *only*, with no single-region availability anywhere. Note the
+  hostname shape — `.rep.`, rather than a `{region}-` prefix.
+- **The API key must belong to the project** in `GOOGLE_CLOUD_PROJECT`.
+
+**There is no fallback to the global endpoint.** If the Vertex configuration is
+incomplete, GooseQuill refuses to start the job rather than quietly sending your
+documents somewhere else — which is the failure a residency endpoint exists to
+prevent.
+
+Two limitations, both stated plainly rather than discovered later:
+
+| | |
+|---|---|
+| **Batch jobs** | Not available. The batch flow uploads its payload through the Gemini File API, which Vertex doesn't offer — it stages batch input in Cloud Storage instead, which GooseQuill doesn't implement. Convert normally and pay the standard rate rather than the 50% batch rate. |
+| **Cost estimates** | Approximate. The **Sync Pricing** feature reads Google's *Gemini API* pricing page, and Vertex publishes its own rates at [cloud.google.com/vertex-ai/pricing](https://cloud.google.com/vertex-ai/pricing). Treat the figures as a guide in Vertex mode. |
+
 #### Keeping the key safe
 
 Put the key in `.env`, which is gitignored — never paste it into source files or
