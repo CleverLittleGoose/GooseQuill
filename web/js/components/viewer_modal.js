@@ -6,7 +6,7 @@
 
 import { appState, eventBus } from "../state.js";
 import { showToast } from "../services/notifications.js";
-import { markdownRenderer } from "../services/markdown_renderer.js";
+import { TranscriptView } from "../services/transcript_view.js";
 import { switchStudioView } from "./header.js";
 
 let autoSyncEnabled = true;
@@ -18,6 +18,15 @@ let rawEditorDirty = false;
 // scrolling, and must not drive page detection.
 let lastProgrammaticScrollTop = null;
 
+// One virtualised transcript per surface. The modal and the Studio each own
+// their panes, so they each own a view.
+const transcripts = { viewer: null, studio: null };
+
+/** The TranscriptView belonging to whichever surface is live. */
+function getActiveTranscript() {
+  return getActiveContext().isModal ? transcripts.viewer : transcripts.studio;
+}
+
 // Viewer & Studio State
 let viewerFormat = "rendered"; // "rendered" | "raw"
 let viewerScope = "all";       // "all" | "page"
@@ -28,7 +37,6 @@ const searchState = {
   isOpen: false,
   query: "",
   matchCase: false,
-  matches: [],        // <mark> nodes, rendered mode
   rawMatches: [],     // {start, end} offsets, raw editor mode
   currentIndex: -1,
   debounceTimer: null
@@ -306,7 +314,7 @@ export function initViewerModal() {
         if (isEchoOfProgrammaticScroll(event.currentTarget)) return;
         if (!isTicking) {
           window.requestAnimationFrame(() => {
-            detectActivePageFromMarkdownScroll(viewerMarkdownPane, "viewerMarkdownContent");
+            if (transcripts.viewer) transcripts.viewer.syncActivePageFromScroll();
             isTicking = false;
           });
           isTicking = true;
@@ -326,7 +334,7 @@ export function initViewerModal() {
         if (isEchoOfProgrammaticScroll(event.currentTarget)) return;
         if (!isTicking) {
           window.requestAnimationFrame(() => {
-            detectActivePageFromMarkdownScroll(studioMarkdownPane, "studioMarkdownContent");
+            if (transcripts.studio) transcripts.studio.syncActivePageFromScroll();
             isTicking = false;
           });
           isTicking = true;
@@ -376,35 +384,6 @@ function isTextEntryElement(el) {
 const PROGRAMMATIC_SCROLL_SETTLE_MS = 120;
 
 /**
- * Scroll a target into view *within its own pane*, and mute the sync listener
- * until it lands.
- *
- * Positioning is instant on purpose. `behavior: "smooth"` does not move these
- * panes at all — verified at both 1.3k and 605k px of scroll height — so the
- * page-index jump silently did nothing. Instant is also the right feel here:
- * jumping to page 140 of a filing should arrive, not animate through 139 pages.
- */
-function scrollTargetIntoPane(pane, target, block = "start") {
-  if (!pane || !target) return;
-
-  const paneRect = pane.getBoundingClientRect();
-  const targetRect = target.getBoundingClientRect();
-  let top = pane.scrollTop + (targetRect.top - paneRect.top);
-  if (block === "center") {
-    top -= Math.max(0, (pane.clientHeight - targetRect.height) / 2);
-  }
-  top = Math.max(0, Math.min(top, pane.scrollHeight - pane.clientHeight));
-
-  isProgrammaticScroll = true;
-  pane.scrollTop = top;
-  lastProgrammaticScrollTop = pane.scrollTop;
-  clearTimeout(scrollTimeout);
-  scrollTimeout = setTimeout(() => {
-    isProgrammaticScroll = false;
-  }, PROGRAMMATIC_SCROLL_SETTLE_MS);
-}
-
-/**
  * True when this scroll event is our own move echoing back.
  *
  * The timer alone is not enough: a 600,000px transcript keeps settling as
@@ -441,6 +420,12 @@ function parseMarkdownPages(fullMarkdown) {
     pages[1] = fullMarkdown.trim();
     return pages;
   }
+
+  // Everything before the first page marker is the document header the
+  // converter writes (title, source file, model). Splitting on markers alone
+  // dropped it, so it is carried separately rather than lost.
+  const preamble = fullMarkdown.slice(0, splits[0].start).trim();
+  if (preamble) pages.preamble = preamble;
 
   for (let i = 0; i < splits.length; i++) {
     const current = splits[i];
@@ -514,33 +499,51 @@ export function setViewerScope(scope) {
  * Update Markdown panes with current format and scope
  */
 function updateViewerDisplay() {
-  const content = getActiveMarkdownText();
-  const renderedHtml = markdownRenderer.render(content);
+  const rawText = getActiveMarkdownText();
 
-  // Modal
-  const viewerRendered = document.getElementById("viewerMarkdownContent");
+  // The raw editor still holds plain text; only the rendered side is virtualised.
   const viewerRawTextarea = document.getElementById("viewerRawMarkdownTextarea");
-  if (viewerRendered) {
-    viewerRendered.innerHTML = renderedHtml;
-    if (viewerScope === "all") tagPageSections(viewerRendered);
-  }
-  if (viewerRawTextarea) {
-    viewerRawTextarea.value = content;
-  }
-
-  // Studio
-  const studioRendered = document.getElementById("studioMarkdownContent");
   const studioRawTextarea = document.getElementById("studioRawMarkdownTextarea");
-  if (studioRendered) {
-    studioRendered.innerHTML = renderedHtml;
-    if (viewerScope === "all") tagPageSections(studioRendered);
-  }
-  if (studioRawTextarea) {
-    studioRawTextarea.value = content;
-  }
+  if (viewerRawTextarea) viewerRawTextarea.value = rawText;
+  if (studioRawTextarea) studioRawTextarea.value = rawText;
 
-  // Highlight active page item in Studio outline
+  const restrictToPage = viewerScope === "page" ? appState.currentPdfPage : null;
+  ensureTranscriptViews();
+
+  [transcripts.viewer, transcripts.studio].forEach((view) => {
+    if (view) view.setDocument(pagesMap, { restrictToPage });
+  });
+
   updateStudioOutlineActiveItem();
+}
+
+/**
+ * Create the per-surface transcript views once the panes exist.
+ */
+function ensureTranscriptViews() {
+  const defs = [
+    ["viewer", "viewerMarkdownPane", "viewerMarkdownContent"],
+    ["studio", "studioMarkdownPane", "studioMarkdownContent"]
+  ];
+
+  defs.forEach(([key, paneId, contentId]) => {
+    if (transcripts[key]) return;
+    const pane = document.getElementById(paneId);
+    const content = document.getElementById(contentId);
+    if (!pane || !content) return;
+
+    transcripts[key] = new TranscriptView(pane, content, {
+      onActivePageChange: (page) => {
+        // Only the live surface may drive the shared page state.
+        if (getActiveTranscript() !== transcripts[key]) return;
+        if (page === appState.currentPdfPage) return;
+        if (page < 1 || page > appState.totalPdfPages) return;
+        appState.currentPdfPage = page;
+        updatePdfPageView();
+        updateStudioOutlineActiveItem();
+      }
+    });
+  });
 }
 
 /**
@@ -682,11 +685,8 @@ export function goToPage(pageNumber, scrollToMarkdown = true) {
   if (viewerScope === "page") {
     updateViewerDisplay();
   } else if (scrollToMarkdown && autoSyncEnabled) {
-    // Scoped to the active pane: both surfaces tag their headings, so a
-    // document-wide lookup would scroll whichever one happens to come first.
-    const { pane, content } = getActiveContext();
-    const targetEl = content && content.querySelector(`[data-page="${pageNumber}"]`);
-    if (targetEl) scrollTargetIntoPane(pane, targetEl, "start");
+    const view = getActiveTranscript();
+    if (view) view.scrollToPage(pageNumber);
   }
 }
 
@@ -724,70 +724,6 @@ export function updatePdfPageView() {
   if (studioPdfPageImage) studioPdfPageImage.src = imgUrl;
 }
 
-/**
- * Detect active page marker from scroll position
- */
-function detectActivePageFromMarkdownScroll(pane, contentId) {
-  const content = document.getElementById(contentId);
-  if (!pane || !content) return;
-
-  const pageMarkers = content.querySelectorAll("[data-page]");
-  if (!pageMarkers || pageMarkers.length === 0) return;
-
-  const paneRect = pane.getBoundingClientRect();
-  const threshold = paneRect.top + 120;
-
-  let activePage = 1;
-  pageMarkers.forEach((marker) => {
-    const rect = marker.getBoundingClientRect();
-    if (rect.top <= threshold) {
-      const p = parseInt(marker.dataset.page, 10);
-      if (!isNaN(p)) activePage = p;
-    }
-  });
-
-  if (activePage !== appState.currentPdfPage && activePage >= 1 && activePage <= appState.totalPdfPages) {
-    appState.currentPdfPage = activePage;
-    updatePdfPageView();
-    updateStudioOutlineActiveItem();
-  }
-}
-
-/**
- * Decorate page headers with data-page attributes and badges
- */
-function tagPageSections(container) {
-  if (!container) return;
-  const elements = container.querySelectorAll("h1, h2, h3, h4, h5, h6, p");
-  const foundPages = new Set();
-
-  elements.forEach((el) => {
-    const text = el.textContent.trim();
-    const match = text.match(/^Page\s+(\d+)(?:\s*(?:of|\/|\:|\-)\s*\d+)?/i) || text.match(/^##+\s*Page\s+(\d+)/i);
-    if (match) {
-      const pageNum = parseInt(match[1], 10);
-      if (!isNaN(pageNum) && !foundPages.has(pageNum)) {
-        foundPages.add(pageNum);
-        // Deliberately no id here: the modal and the Studio both tag their own
-        // copy, and identical ids across them made every lookup ambiguous.
-        el.dataset.page = pageNum;
-        el.classList.add("doc-page-heading");
-
-        if (!el.querySelector(".doc-page-badge")) {
-          const badge = document.createElement("span");
-          badge.className = "doc-page-badge";
-          badge.textContent = `PAGE ${pageNum}`;
-          el.appendChild(badge);
-        }
-      }
-    }
-  });
-
-  if (!foundPages.has(1) && container.firstElementChild) {
-    container.firstElementChild.dataset.page = 1;
-  }
-}
-
 /* ==========================================================================
    RAW EDITOR PERSISTENCE
    ========================================================================== */
@@ -808,9 +744,7 @@ function updateSaveButtonState() {
     btn.disabled = !rawEditorDirty;
     btn.classList.toggle("btn-primary", rawEditorDirty);
     btn.classList.toggle("btn-secondary", !rawEditorDirty);
-    btn.title = rawEditorDirty
-      ? "Save edits to the .md file on disk"
-      : "No unsaved changes";
+    btn.title = rawEditorDirty ? "Save edits to the .md file on disk" : "No unsaved changes";
   });
 }
 
@@ -847,14 +781,12 @@ async function saveRawMarkdown() {
     rawEditorDirty = false;
     updateSaveButtonState();
 
-    // Refresh the rendered pane so the two views cannot drift apart.
-    const renderedHtml = markdownRenderer.render(content);
-    ["viewerMarkdownContent", "studioMarkdownContent"].forEach((id) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      el.innerHTML = renderedHtml;
-      if (viewerScope === "all") tagPageSections(el);
+    // Rebuild the rendered side from the saved text so the two views cannot
+    // drift apart. The editor already holds it, so it is left alone.
+    [transcripts.viewer, transcripts.studio].forEach((view) => {
+      if (view) view.setDocument(pagesMap, { restrictToPage: null });
     });
+    renderStudioPageList();
 
     showToast("Saved", "Markdown written to disk.");
   } catch (e) {
@@ -863,12 +795,8 @@ async function saveRawMarkdown() {
 }
 
 /* ==========================================================================
-   SEARCH ENGINE IMPLEMENTATION
+   SEARCH
    ========================================================================== */
-
-function getActiveSearchContainer() {
-  return getActiveContext().content;
-}
 
 /**
  * Measure where a character offset lands inside a textarea, accounting for soft
@@ -984,7 +912,6 @@ export function openSearchBar() {
 export function closeSearchBar() {
   searchState.isOpen = false;
   searchState.query = "";
-  searchState.matches = [];
   searchState.rawMatches = [];
   searchState.currentIndex = -1;
 
@@ -993,9 +920,13 @@ export function closeSearchBar() {
   document.querySelectorAll("#viewerSearchCount, #studioSearchCount").forEach((c) => (c.textContent = "0/0"));
   document.querySelectorAll("#viewerSearchPrevBtn, #studioSearchPrevBtn, #viewerSearchNextBtn, #studioSearchNextBtn").forEach((b) => (b.disabled = true));
 
+  [transcripts.viewer, transcripts.studio].forEach((view) => {
+    if (view) view.clearSearch();
+  });
   clearSearchHighlights();
 }
 
+/** Belt and braces: strip any stray marks left in either rendered container. */
 function clearSearchHighlights() {
   const containers = [document.getElementById("viewerMarkdownContent"), document.getElementById("studioMarkdownContent")];
   containers.forEach((container) => {
@@ -1042,102 +973,42 @@ function handleSearchKeydown(e) {
 }
 
 export function performSearch(query, matchCase = false) {
-  clearSearchHighlights();
   searchState.query = (query || "").trim();
 
-  // The raw editor is a textarea; it cannot hold <mark> nodes, and the rendered
+  const countEls = document.querySelectorAll("#viewerSearchCount, #studioSearchCount");
+  const navBtns = document.querySelectorAll("#viewerSearchPrevBtn, #studioSearchPrevBtn, #viewerSearchNextBtn, #studioSearchNextBtn");
+
+  // The raw editor is a textarea; it holds no <mark> nodes and the rendered
   // pane it used to search is hidden while the editor is up.
   if (viewerFormat === "raw") {
     performRawSearch(query, matchCase, getActiveContext().textarea);
     return;
   }
 
-  const container = getActiveSearchContainer();
-  const trimmed = (query || "").trim();
-  searchState.query = trimmed;
-  searchState.matches = [];
-  searchState.currentIndex = -1;
+  const view = getActiveTranscript();
+  if (!view) return;
 
-  const countEls = document.querySelectorAll("#viewerSearchCount, #studioSearchCount");
-  const navBtns = document.querySelectorAll("#viewerSearchPrevBtn, #studioSearchPrevBtn, #viewerSearchNextBtn, #studioSearchNextBtn");
-
-  if (!trimmed || !container) {
+  if (!searchState.query) {
+    view.clearSearch();
     countEls.forEach((c) => (c.textContent = "0/0"));
     navBtns.forEach((b) => (b.disabled = true));
     return;
   }
 
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_SKIP;
-      const parent = node.parentElement;
-      if (
-        parent &&
-        (parent.tagName === "SCRIPT" ||
-          parent.tagName === "STYLE" ||
-          parent.classList.contains("doc-page-badge") ||
-          parent.classList.contains("search-count"))
-      ) {
-        return NodeFilter.FILTER_REJECT;
-      }
-      return NodeFilter.FILTER_ACCEPT;
-    }
-  });
+  // Matching runs over a per-page text index rather than the DOM, so pages
+  // that were never rendered still count — and only the visited match is
+  // wrapped, instead of thousands of <mark> nodes at once.
+  const { total, indexing } = view.search(searchState.query, matchCase);
 
-  const textNodes = [];
-  let currentNode;
-  while ((currentNode = walker.nextNode())) {
-    textNodes.push(currentNode);
-  }
-
-  const flags = matchCase ? "g" : "gi";
-  const regex = new RegExp(escapeRegExp(trimmed), flags);
-  const foundMatches = [];
-
-  textNodes.forEach((node) => {
-    const text = node.nodeValue;
-    if (!regex.test(text)) return;
-    regex.lastIndex = 0;
-
-    const fragment = document.createDocumentFragment();
-    let lastIdx = 0;
-    let match;
-
-    while ((match = regex.exec(text)) !== null) {
-      const matchStart = match.index;
-      const matchEnd = match.index + match[0].length;
-
-      if (matchStart > lastIdx) {
-        fragment.appendChild(document.createTextNode(text.substring(lastIdx, matchStart)));
-      }
-
-      const mark = document.createElement("mark");
-      mark.className = "viewer-search-match";
-      mark.textContent = match[0];
-      fragment.appendChild(mark);
-      foundMatches.push(mark);
-
-      lastIdx = matchEnd;
-    }
-
-    if (lastIdx < text.length) {
-      fragment.appendChild(document.createTextNode(text.substring(lastIdx)));
-    }
-
-    if (node.parentNode) {
-      node.parentNode.replaceChild(fragment, node);
-    }
-  });
-
-  searchState.matches = foundMatches;
-
-  if (foundMatches.length > 0) {
-    navBtns.forEach((b) => (b.disabled = false));
-    activateMatch(0, true);
-  } else {
-    countEls.forEach((c) => (c.textContent = "0 matches"));
+  if (total === 0) {
+    countEls.forEach((c) => (c.textContent = indexing ? "indexing…" : "0 matches"));
     navBtns.forEach((b) => (b.disabled = true));
+    return;
   }
+
+  navBtns.forEach((b) => (b.disabled = false));
+  view.goToHit(0);
+  syncSearchCountFromView(view);
 }
 
 export function navigateMatch(direction = 1) {
@@ -1148,57 +1019,21 @@ export function navigateMatch(direction = 1) {
     return;
   }
 
-  if (searchState.matches.length === 0) return;
-  const count = searchState.matches.length;
-  const nextIdx = (searchState.currentIndex + direction + count) % count;
-  activateMatch(nextIdx, true);
+  const view = getActiveTranscript();
+  if (!view || view.searchHits.length === 0) return;
+  view.nextHit(direction);
+  syncSearchCountFromView(view);
 }
 
-function activateMatch(index, scrollToMatch = true) {
-  if (index < 0 || index >= searchState.matches.length) return;
-
-  searchState.matches.forEach((m) => m.classList.remove("viewer-search-match-active"));
-  searchState.currentIndex = index;
-
-  const activeMark = searchState.matches[index];
-  activeMark.classList.add("viewer-search-match-active");
-
-  const countStr = `${index + 1} of ${searchState.matches.length}`;
+/** Mirror the view's search position into the toolbar, and follow it with the PDF. */
+function syncSearchCountFromView(view) {
+  const countStr = `${view.currentHitIndex + 1} of ${view.searchHits.length}`;
   document.querySelectorAll("#viewerSearchCount, #studioSearchCount").forEach((c) => (c.textContent = countStr));
 
-  const pageNum = detectMatchPageNumber(activeMark);
-  if (pageNum && pageNum !== appState.currentPdfPage && pageNum >= 1 && pageNum <= appState.totalPdfPages) {
-    appState.currentPdfPage = pageNum;
+  const page = view.getCurrentHitPage();
+  if (page && page !== appState.currentPdfPage && page >= 1 && page <= appState.totalPdfPages) {
+    appState.currentPdfPage = page;
     updatePdfPageView();
     updateStudioOutlineActiveItem();
   }
-
-  if (scrollToMatch) {
-    scrollTargetIntoPane(getActiveContext().pane, activeMark, "center");
-  }
-}
-
-function detectMatchPageNumber(element) {
-  const container = getActiveSearchContainer();
-  if (!container || !element) return 1;
-
-  let current = element;
-  while (current && current !== container) {
-    if (current.dataset && current.dataset.page) {
-      return parseInt(current.dataset.page, 10);
-    }
-    let prev = current.previousElementSibling;
-    while (prev) {
-      if (prev.dataset && prev.dataset.page) {
-        return parseInt(prev.dataset.page, 10);
-      }
-      const childPage = prev.querySelector("[data-page]");
-      if (childPage && childPage.dataset.page) {
-        return parseInt(childPage.dataset.page, 10);
-      }
-      prev = prev.previousElementSibling;
-    }
-    current = current.parentElement;
-  }
-  return 1;
 }

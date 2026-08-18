@@ -2419,3 +2419,34 @@ input[type="checkbox"]:focus-visible {
   border-radius: 10px;
 }
 
+
+/* ==========================================================================
+   Virtualised Transcript Pages
+   ========================================================================== */
+
+/* Each page is its own section so it can be released when far off-screen.
+   The placeholder keeps the page's measured height, so the scrollbar stays
+   honest and nothing below shifts when a page is dropped or restored. */
+.tv-page {
+  display: block;
+  position: relative;
+  contain: layout style;
+}
+
+.tv-page:not(:last-child) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+
+/* An unrendered page should read as "not here yet", not as a gap. */
+.tv-page:empty {
+  background-image: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.018) 0,
+    rgba(255, 255, 255, 0.018) 1px,
+    transparent 1px,
+    transparent 34px
+  );
+  border-radius: 6px;
+}
