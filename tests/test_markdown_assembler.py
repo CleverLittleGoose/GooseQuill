@@ -61,6 +61,42 @@ Content for page two.
         self.assertIn("Content for page one.", split_dict[1])
         self.assertIn("Content for page two.", split_dict[2])
 
+    def test_clean_page_markdown(self):
+        fenced_md = "```markdown\n## Strategic Report\n\nRevenue grew by 15%.\n```"
+        cleaned = MarkdownAssembler.clean_page_markdown(fenced_md)
+        self.assertEqual(cleaned, "## Strategic Report\n\nRevenue grew by 15%.")
+
+        plain_md = "## Balance Sheet\n\nTotal Assets: £10,000"
+        self.assertEqual(MarkdownAssembler.clean_page_markdown(plain_md), plain_md)
+
+        bare_fence = "```\n# Notice of Charge\n\nBody text.\n```"
+        self.assertEqual(MarkdownAssembler.clean_page_markdown(bare_fence), "# Notice of Charge\n\nBody text.")
+
+    def test_clean_page_markdown_preserves_pages_with_two_code_blocks(self):
+        """A page that merely starts and ends with a fence must not be unwrapped."""
+        page = (
+            "```\n"
+            "NOTICE OF CHARGE\n"
+            "```\n"
+            "\n"
+            "Some real body text of the filing.\n"
+            "\n"
+            "```\n"
+            "SCHEDULE 2\n"
+            "```"
+        )
+        self.assertEqual(MarkdownAssembler.clean_page_markdown(page), page)
+
+    def test_clean_page_markdown_preserves_genuine_code_blocks(self):
+        """A fence with a real info string delimits document content, not an LLM wrapper."""
+        for src in ("```python\nprint(1)\n```", "```sql\nSELECT 1;\n```"):
+            self.assertEqual(MarkdownAssembler.clean_page_markdown(src), src)
+
+    def test_clean_page_markdown_preserves_unbalanced_fence(self):
+        """An opening fence with no closing fence is left exactly as transcribed."""
+        src = "```\nstuff without a closing fence"
+        self.assertEqual(MarkdownAssembler.clean_page_markdown(src), src)
+
     def test_save_and_read_document(self):
         target_path = self.test_dir / "subdir" / "test.md"
         content = "# Testing Save and Read"

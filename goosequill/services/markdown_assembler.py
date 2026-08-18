@@ -5,6 +5,50 @@ from typing import List, Optional, Dict
 class MarkdownAssembler:
     """Handles assembly, page partitioning, and persistence of converted Markdown documents."""
 
+    # A page that an LLM wrapped in a fence opens with ```/```markdown/```md and
+    # nothing else on the line. Any other info string (```python, ```sql) marks a
+    # block the document genuinely contains, and must be left alone.
+    _OPENING_FENCE_RE = re.compile(r"^(`{3,})[ \t]*([^\s`]*)[ \t]*$")
+    _UNWRAPPABLE_INFO_STRINGS = {"", "markdown", "md"}
+
+    @staticmethod
+    def clean_page_markdown(content: str) -> str:
+        """Unwrap a code fence that an LLM wrapped around a whole page of markdown.
+
+        Only unwraps when the opening fence is closed by the *last* line of the
+        page. Checking "starts with a fence and ends with a fence" is not enough:
+        a page holding two ordinary code blocks satisfies that too, and stripping
+        its outer lines leaves the prose between the blocks fenced instead.
+        """
+        if not content:
+            return ""
+
+        cleaned = content.strip()
+        lines = cleaned.splitlines()
+        if len(lines) < 2:
+            return cleaned
+
+        opening = MarkdownAssembler._OPENING_FENCE_RE.match(lines[0].strip())
+        if not opening:
+            return cleaned
+
+        ticks, info = opening.group(1), opening.group(2).lower()
+        if info not in MarkdownAssembler._UNWRAPPABLE_INFO_STRINGS:
+            return cleaned
+
+        # A fence is closed by the first run of at least as many backticks with a
+        # bare info string. If that is not the final line, the opening fence
+        # delimits a block inside the page rather than the page itself.
+        closing_re = re.compile(r"^`{%d,}[ \t]*$" % len(ticks))
+        closing_idx = next(
+            (i for i in range(1, len(lines)) if closing_re.match(lines[i].strip())),
+            None,
+        )
+        if closing_idx != len(lines) - 1:
+            return cleaned
+
+        return "\n".join(lines[1:closing_idx]).strip()
+
     @staticmethod
     def assemble_document(
         stem: str,
@@ -25,6 +69,7 @@ class MarkdownAssembler:
         for idx, page_md in enumerate(page_results):
             page_num = idx + 1
             content = page_md or f"> **[Page {page_num} conversion pending/failed]**"
+            content = MarkdownAssembler.clean_page_markdown(content)
             full_content_parts.append(f"\n<!-- Page {page_num} -->\n## Page {page_num}\n\n{content}\n\n---\n")
 
         return "\n".join(full_content_parts)

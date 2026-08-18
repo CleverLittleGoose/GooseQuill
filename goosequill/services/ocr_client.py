@@ -85,6 +85,8 @@ class GeminiOCRClient:
                     ]
                 )
                 text = response.output_text or ""
+                # Fence unwrapping happens once, in MarkdownAssembler, so the
+                # live and batch paths treat model output identically.
                 return text.strip()
             except Exception as e:
                 last_exception = e

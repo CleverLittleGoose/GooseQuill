@@ -23,6 +23,42 @@ class MarkdownRenderer {
 
     this._configureRenderers();
     this._configurePurifyHooks();
+    MarkdownRenderer._installImageErrorHandler();
+  }
+
+  /**
+   * Escape a value for interpolation into a double-quoted HTML attribute.
+   */
+  static escapeAttribute(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  /**
+   * Hide images that fail to load, without an inline onerror attribute.
+   *
+   * `error` does not bubble, so this listens in the capture phase at the
+   * document root. One listener covers every rendered pane, including panes
+   * that get their innerHTML replaced later.
+   */
+  static _installImageErrorHandler() {
+    if (MarkdownRenderer._imageErrorHandlerInstalled) return;
+    MarkdownRenderer._imageErrorHandlerInstalled = true;
+
+    document.addEventListener(
+      "error",
+      (event) => {
+        const el = event.target;
+        if (el && el.tagName === "IMG" && el.classList.contains("markdown-img")) {
+          el.style.display = "none";
+        }
+      },
+      true
+    );
   }
 
   _configureRenderers() {
@@ -52,12 +88,14 @@ class MarkdownRenderer {
           const isValidDataUri = imgHref.startsWith("data:image/") && imgHref.length > 100 && !imgHref.includes("…") && !imgHref.includes("...");
 
           if (isServerApi || isCompleteHttps || isValidDataUri) {
-            return `<img src="${imgHref}" alt="${imgText}" title="${imgTitle}" class="markdown-img" loading="lazy" onerror="this.style.display='none'" />`;
+            const attr = MarkdownRenderer.escapeAttribute;
+            return `<img src="${attr(imgHref)}" alt="${attr(imgText)}" title="${attr(imgTitle)}" class="markdown-img" loading="lazy" />`;
           }
 
           // Relative/missing filenames (e.g. barcode.png, logo.jpg) -> Render pleasant badge instead of 404
           const label = imgText || imgTitle || imgHref.split("/").pop() || "Document Graphic";
-          return `<span class="badge" style="font-size: 12.5px; font-family: var(--font-sans); background: rgba(255,255,255,0.07); color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.1); padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px;" title="${imgHref}">🖼️ ${label}</span>`;
+          const esc = MarkdownRenderer.escapeAttribute;
+          return `<span class="badge" style="font-size: 12.5px; font-family: var(--font-sans); background: rgba(255,255,255,0.07); color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.1); padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px;" title="${esc(imgHref)}">🖼️ ${esc(label)}</span>`;
         },
 
         // Responsive table wrapper for financial statements & data tables
@@ -121,6 +159,59 @@ class MarkdownRenderer {
   }
 
   /**
+   * Unwrap a code fence that wraps a whole page of markdown.
+   *
+   * The server strips these at assembly time now, so this only exists for .md
+   * files converted before that fix. It deliberately mirrors the server rule
+   * (MarkdownAssembler.clean_page_markdown): unwrap only when the opening fence
+   * is closed by the very last line, otherwise a page holding two ordinary code
+   * blocks gets its outer fences eaten and the prose between them rendered as
+   * code.
+   *
+   * @param {string} markdownText
+   * @returns {string} Cleaned markdown
+   */
+  _preprocessMarkdown(markdownText) {
+    if (!markdownText) return "";
+
+    // Page-level wrapper emitted directly after a page header, e.g.
+    // `<!-- Page 3 -->\n## Page 3\n\u0060\u0060\u0060markdown\n...\n\u0060\u0060\u0060`
+    const processed = markdownText.replace(
+      /(<!--\s*Page\s+\d+\s*-->\s*(?:##\s*Page\s+\d+\s*)?)```(?:markdown|md)?[ \t]*\n([\s\S]*?)\n```[ \t]*(?=\n|$)/gi,
+      (match, prefix, inner) => (inner.includes("```") ? match : `${prefix}\n${inner}\n`)
+    );
+
+    return MarkdownRenderer.unwrapWholeDocumentFence(processed);
+  }
+
+  /**
+   * Unwrap a fence enclosing the entire string, or return the string unchanged.
+   */
+  static unwrapWholeDocumentFence(text) {
+    const trimmed = (text || "").trim();
+    const lines = trimmed.split("\n");
+    if (lines.length < 2) return trimmed;
+
+    const opening = /^(`{3,})[ \t]*([^\s`]*)[ \t]*$/.exec(lines[0].trim());
+    if (!opening) return trimmed;
+
+    const [, ticks, info] = opening;
+    if (!["", "markdown", "md"].includes(info.toLowerCase())) return trimmed;
+
+    const closing = new RegExp(`^\`{${ticks.length},}[ \\t]*$`);
+    let closingIdx = -1;
+    for (let i = 1; i < lines.length; i++) {
+      if (closing.test(lines[i].trim())) {
+        closingIdx = i;
+        break;
+      }
+    }
+    if (closingIdx !== lines.length - 1) return trimmed;
+
+    return lines.slice(1, closingIdx).join("\n").trim();
+  }
+
+  /**
    * Render markdown string into safe, sanitized HTML
    * @param {string} markdownText 
    * @returns {string} Safe HTML string
@@ -128,22 +219,28 @@ class MarkdownRenderer {
   render(markdownText) {
     if (!markdownText) return "";
 
+    const cleanedMarkdown = this._preprocessMarkdown(markdownText);
+
     let rawHtml = "";
     if (this.markedInstance) {
       try {
-        rawHtml = this.markedInstance.parse(markdownText);
+        rawHtml = this.markedInstance.parse(cleanedMarkdown);
       } catch (err) {
         console.error("Markdown parse error:", err);
-        rawHtml = `<pre class="error-pre">${this._escapeHtml(markdownText)}</pre>`;
+        rawHtml = `<pre class="error-pre">${this._escapeHtml(cleanedMarkdown)}</pre>`;
       }
     } else {
-      rawHtml = `<pre>${this._escapeHtml(markdownText)}</pre>`;
+      rawHtml = `<pre>${this._escapeHtml(cleanedMarkdown)}</pre>`;
     }
 
     // Sanitize with DOMPurify if available
     if (typeof DOMPurify !== "undefined" && this.options.sanitize) {
       return DOMPurify.sanitize(rawHtml, {
-        ADD_ATTR: ["target", "data-page", "class", "loading", "onerror"],
+        // No event-handler attributes here, ever. Markdown reaching this point is
+        // model output transcribed from third-party PDFs, so an `onerror` in
+        // ADD_ATTR is a direct script-execution path. Broken images are hidden by
+        // the delegated listener installed in _installImageErrorHandler instead.
+        ADD_ATTR: ["target", "data-page", "class", "loading"],
         ADD_TAGS: ["table", "thead", "tbody", "tr", "th", "td", "span"]
       });
     }
