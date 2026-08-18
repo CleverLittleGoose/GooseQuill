@@ -190,3 +190,42 @@ class TestBatchOnVertex(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFirstRunWithoutAKey(unittest.TestCase):
+    """A missing key is where every new user starts, and most of the app works
+    without one. It must not present as a fault."""
+
+    def setUp(self):
+        patcher = mock.patch("goosequill.services.genai_factory.load_dotenv",
+                             lambda *a, **k: None)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        # ocr_client calls load_dotenv itself, which would reload a real .env
+        # and hand the test a working key.
+        patcher2 = mock.patch("goosequill.services.ocr_client.load_dotenv",
+                              lambda *a, **k: None)
+        patcher2.start()
+        self.addCleanup(patcher2.stop)
+
+    def test_missing_key_is_reported_as_a_state_not_a_fault(self):
+        from starlette.testclient import TestClient
+        import app as app_module
+        with clean_env():
+            with TestClient(app_module.app) as client:
+                data = client.get("/api/test_connection").json()
+        self.assertEqual(data["error_type"], "NO_KEY")
+        # The interface uses this to say what the user can still do.
+        self.assertIn("Markdown Combiner", data["offline_features"])
+
+    def test_the_combiner_endpoints_work_without_a_key(self):
+        """The whole point: someone who only wants to combine markdown should
+        never need a key."""
+        from starlette.testclient import TestClient
+        import app as app_module
+        with clean_env():
+            with TestClient(app_module.app) as client:
+                for path in ("/api/documents", "/api/converted_markdowns",
+                             "/api/job_status", "/api/backend"):
+                    res = client.get(path)
+                    self.assertEqual(res.status_code, 200, f"{path} broke without a key")

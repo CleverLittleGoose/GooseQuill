@@ -236,11 +236,19 @@ def test_connection(model: str = "gemini-3.1-flash-lite"):
         result["backend"] = client.backend.to_dict()
         return result
     except Exception as e:
+        # "No key yet" is where every new user starts; "key rejected" is a
+        # fault. They shared an error_type, so the interface had no way to tell
+        # a first run from a broken one and showed both in red.
+        no_key = "no api key" in str(e).lower()
         return {
             "status": "error",
-            "error_type": "INIT_ERROR",
+            "error_type": "NO_KEY" if no_key else "INIT_ERROR",
             "model": model,
             "message": str(e),
+            # What the user can still do without a key. Conversion needs Gemini;
+            # the Markdown Combiner and the document browser do not.
+            "offline_features": ["Markdown Combiner", "Document browser",
+                                 "Viewer"] if no_key else [],
             "backend": backend_info()
         }
 

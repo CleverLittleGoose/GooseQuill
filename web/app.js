@@ -80,11 +80,20 @@ async function init() {
   // 3. Update Notifications
   updateNotificationUI();
 
-  // 4. Initial Data Load & Background Checks
+  // 4. Initial data load.
+  //
+  // Only the document scan is awaited: it is what the interface is waiting to
+  // draw. Everything after it is a background check, and two of them reach
+  // Google — which took 2.7s on a good connection and held the whole UI behind
+  // it. Worse, it made the app look Gemini-gated when it is not: the Combiner
+  // needs no key at all, and the document list is a local scan.
   await fetchDocuments();
-  await testApiConnection(false);
-  await checkJobStatus();
-  await fetchBatchJobs(false);
+
+  // Deliberately not awaited, and each isolated: a rejected API key must not
+  // stop the job poller or the batch list from starting.
+  testApiConnection(false).catch(() => {});
+  checkJobStatus().catch(() => {});
+  fetchBatchJobs(false).catch(() => {});
 }
 
 window.addEventListener("DOMContentLoaded", init);

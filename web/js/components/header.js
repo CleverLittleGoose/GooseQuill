@@ -150,10 +150,23 @@ export async function testApiConnection(userInitiated = false) {
       if (statusDot) statusDot.className = "pulse-dot error";
       if (apiStatusText) apiStatusText.textContent = "API Error (Click for details)";
 
+      const noKey = data.error_type === "NO_KEY";
+      if (apiStatusText) {
+        apiStatusText.textContent = noKey ? "No API key set" : "API Error (Click for details)";
+      }
+      if (apiStatusPill) apiStatusPill.className = `status-pill ${noKey ? "warning" : "error"}`;
+      if (statusDot) statusDot.className = `pulse-dot ${noKey ? "warning" : "error"}`;
+
       eventBus.emit("alert:show", {
-        title: `Gemini API Error (${data.error_type || "Error"})`,
-        message: data.message,
-        isWarning: false
+        title: noKey ? "No Gemini API key set" : `Gemini API Error (${data.error_type || "Error"})`,
+        // Naming what still works is the point. Without it a first run looks
+        // like a broken app, and someone who only wanted to combine markdown
+        // has no way of knowing they can carry on.
+        message: noKey
+          ? `Converting PDFs needs a Gemini API key — add one in Settings. `
+            + `Everything else works without it: ${(data.offline_features || []).join(", ")}.`
+          : data.message,
+        isWarning: noKey
       });
     }
   } catch (err) {
