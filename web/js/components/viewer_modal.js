@@ -692,20 +692,29 @@ function updateStudioOutlineActiveItem() {
  * Open document in full Document Studio Workspace
  */
 export async function openDocumentInStudio(doc, { startPage = 1 } = {}) {
-  setupDocState(doc);
-
-  // Show Document Studio nav tab
   const tabNavStudio = document.getElementById("tabNavStudio");
-  const tabNavStudioDocName = document.getElementById("tabNavStudioDocName");
   if (tabNavStudio) tabNavStudio.style.display = "inline-flex";
-  if (tabNavStudioDocName) tabNavStudioDocName.textContent = doc.name;
 
   switchStudioView("studio");
   applyZoom();
-  await loadAndRenderDoc(doc);
 
-  // Arriving from a search result means arriving at a page, not at page one.
-  if (startPage > 1) goToPage(startPage, true);
+  // Already open: go to it rather than loading a second copy.
+  const existing = findStudioTab(doc.path);
+  if (existing !== -1) {
+    await activateStudioTab(existing, startPage > 1 ? startPage : null);
+    return;
+  }
+
+  captureActiveTabPosition();
+  studioTabs.push({
+    doc,
+    content: null,
+    pagesMap: null,
+    markdownPath: null,
+    currentPage: startPage
+  });
+
+  await activateStudioTab(studioTabs.length - 1, startPage);
 }
 
 /**
@@ -838,6 +847,143 @@ export function updatePdfPageView() {
   if (studioPdfPrevPageBtn) studioPdfPrevPageBtn.disabled = isFirst;
   if (studioPdfNextPageBtn) studioPdfNextPageBtn.disabled = isLast;
   if (studioPdfPageImage && studioPdfPageImage.getAttribute("src") !== imgUrl) studioPdfPageImage.src = imgUrl;
+}
+
+/* ==========================================================================
+   OPEN DOCUMENTS (STUDIO TABS)
+   ========================================================================== */
+
+/**
+ * Documents currently open in the Studio.
+ *
+ * Studio held exactly one document, so moving between two filings meant going
+ * back to the Workspace and losing your place each time. Each tab keeps its own
+ * loaded transcript and the page it was left on, so switching is instant and
+ * returns you where you were rather than to page one.
+ */
+const studioTabs = [];
+let activeStudioTabIndex = -1;
+
+function findStudioTab(path) {
+  return studioTabs.findIndex((tab) => tab.doc.path === path);
+}
+
+/** Remember where the current tab was left, before moving away from it. */
+function captureActiveTabPosition() {
+  const tab = studioTabs[activeStudioTabIndex];
+  if (!tab) return;
+  tab.currentPage = appState.currentPdfPage;
+  tab.content = appState.currentViewingMarkdownContent;
+  tab.pagesMap = pagesMap;
+  tab.markdownPath = appState.currentViewingMarkdownPath;
+}
+
+function renderStudioTabStrip() {
+  const strip = document.getElementById("studioTabStrip");
+  if (!strip) return;
+
+  // One document is not a set of tabs; the strip only earns its space at two.
+  strip.style.display = studioTabs.length > 1 ? "flex" : "none";
+  strip.innerHTML = "";
+
+  studioTabs.forEach((tab, index) => {
+    const isActive = index === activeStudioTabIndex;
+    const button = document.createElement("div");
+    button.className = `studio-doc-tab ${isActive ? "active" : ""}`;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", String(isActive));
+    button.title = tab.doc.name;
+
+    const label = document.createElement("button");
+    label.className = "studio-doc-tab-label";
+    label.textContent = tab.doc.name.replace(/\.pdf$/i, "");
+    label.addEventListener("click", () => activateStudioTab(index));
+
+    const close = document.createElement("button");
+    close.className = "studio-doc-tab-close";
+    close.setAttribute("aria-label", `Close ${tab.doc.name}`);
+    close.title = "Close";
+    close.textContent = "×";
+    close.addEventListener("click", (event) => {
+      event.stopPropagation();
+      closeStudioTab(index);
+    });
+
+    button.append(label, close);
+    strip.appendChild(button);
+  });
+}
+
+async function activateStudioTab(index, startPage = null) {
+  const tab = studioTabs[index];
+  if (!tab) return;
+
+  if (index !== activeStudioTabIndex) captureActiveTabPosition();
+  activeStudioTabIndex = index;
+
+  setupDocState(tab.doc);
+  renderStudioTabStrip();
+  updateStudioNavTabLabel();
+
+  if (tab.content) {
+    // Already loaded once; restore it rather than fetching again.
+    appState.currentViewingMarkdownContent = tab.content;
+    appState.currentViewingMarkdownPath = tab.markdownPath;
+    pagesMap = tab.pagesMap;
+    rawEditorDirty = false;
+    renderStudioPageList();
+    updateViewerDisplay();
+    updateSaveButtonState();
+  } else {
+    await loadAndRenderDoc(tab.doc);
+    tab.content = appState.currentViewingMarkdownContent;
+    tab.pagesMap = pagesMap;
+    tab.markdownPath = appState.currentViewingMarkdownPath;
+  }
+
+  // Always go, even to page 1: this is what refreshes the scan pane, and
+  // skipping it left the previous tab's page on screen under the new tab's name.
+  const target = startPage || tab.currentPage || 1;
+  goToPage(target, true);
+  updatePdfPageView();
+
+  diffCache.clear();
+  if (diffEnabled) setDiffEnabled(true);
+}
+
+function closeStudioTab(index) {
+  const tab = studioTabs[index];
+  if (!tab) return;
+
+  if (index === activeStudioTabIndex) captureActiveTabPosition();
+  studioTabs.splice(index, 1);
+
+  if (studioTabs.length === 0) {
+    activeStudioTabIndex = -1;
+    renderStudioTabStrip();
+    const navTab = document.getElementById("tabNavStudio");
+    if (navTab) navTab.style.display = "none";
+    switchStudioView("workspace");
+    return;
+  }
+
+  if (index < activeStudioTabIndex) {
+    activeStudioTabIndex -= 1;
+    renderStudioTabStrip();
+  } else if (index === activeStudioTabIndex) {
+    // Land on the neighbour, the way a closed tab usually behaves.
+    activateStudioTab(Math.min(index, studioTabs.length - 1));
+  } else {
+    renderStudioTabStrip();
+  }
+}
+
+function updateStudioNavTabLabel() {
+  const tab = studioTabs[activeStudioTabIndex];
+  const nameEl = document.getElementById("tabNavStudioDocName");
+  const badge = document.getElementById("topNavStudioDocBadge");
+  if (nameEl && tab) nameEl.textContent = tab.doc.name;
+  if (badge) badge.textContent = studioTabs.length > 1 ? `${studioTabs.length} open` : "Active";
 }
 
 /* ==========================================================================
