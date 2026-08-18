@@ -51,6 +51,14 @@ logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
 app = FastAPI(title="GooseQuill — Universal PDF to Markdown")
 
+@app.middleware("http")
+async def add_no_cache_header(request, call_next):
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
     svg_favicon = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📄</text></svg>"""
@@ -59,6 +67,10 @@ def favicon():
 @app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)
 def chrome_devtools_probe():
     return Response(status_code=204)
+
+@app.get("/vendor/purify.min.js.map", include_in_schema=False)
+def purify_sourcemap():
+    return Response(content="{}", media_type="application/json")
 
 # Dynamic project paths
 PROJECT_ROOT = Path(__file__).resolve().parent
