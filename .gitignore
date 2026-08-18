@@ -24,3 +24,8 @@ venv/
 Thumbs.db
 .idea/
 .vscode/
+
+# Claude Code / AI assistant working files
+.claude/
+CLAUDE.md
+.mcp.json
