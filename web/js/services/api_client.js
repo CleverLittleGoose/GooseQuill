@@ -150,5 +150,8 @@ class ApiClient {
   }
 }
 
-// Attach to window for global access
+// Attach to window and export for ES6 modules
+export const apiClient = new ApiClient();
+export { ApiClient };
 window.ApiClient = ApiClient;
+window.apiClient = apiClient;
