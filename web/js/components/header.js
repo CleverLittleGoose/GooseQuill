@@ -94,6 +94,7 @@ export function switchStudioView(viewName) {
   const views = {
     workspace: document.getElementById("viewWorkspace"),
     studio: document.getElementById("viewStudio"),
+    search: document.getElementById("viewSearch"),
     combiner: document.getElementById("viewCombiner"),
     batches: document.getElementById("viewBatches"),
     economics: document.getElementById("viewEconomics")
@@ -114,6 +115,8 @@ export function switchStudioView(viewName) {
   // 3. Trigger view-specific refreshes
   if (viewName === "studio") {
     eventBus.emit("studio:document:activated");
+  } else if (viewName === "search") {
+    eventBus.emit("studio:search:activated");
   } else if (viewName === "combiner") {
     eventBus.emit("studio:combiner:activated");
   } else if (viewName === "batches") {

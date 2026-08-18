@@ -33,7 +33,8 @@ from goosequill.services import (
     ConversionEngine,
     BatchService,
     MarkdownCombinerService,
-    PricingSyncService
+    PricingSyncService,
+    SearchService
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -125,6 +126,7 @@ cache_manager = CacheManager(cache_dir=CACHE_DIR)
 doc_repository = DocumentRepository(cache_manager=cache_manager)
 pdf_renderer = PDFRenderer()
 markdown_assembler = MarkdownAssembler()
+search_service = SearchService()
 job_state = JobState()
 active_engine: Optional[ConversionEngine] = None
 
@@ -558,6 +560,27 @@ def collect_batch_results(req: BatchCollectRequest):
     except Exception as e:
         logger.exception("Batch collect error")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/search")
+def search_documents(
+    q: str,
+    match_case: bool = False,
+    whole_word: bool = False,
+    max_documents: int = 100,
+    max_matches_per_document: int = 5,
+):
+    """Search the text of every converted document in the workspace."""
+    if len(q or "") > 500:
+        raise HTTPException(status_code=400, detail="Search query is too long.")
+    return search_service.search(
+        BASE_ACCOUNTS_DIR,
+        q,
+        match_case=match_case,
+        whole_word=whole_word,
+        max_documents=max(1, min(max_documents, 500)),
+        max_matches_per_document=max(1, min(max_matches_per_document, 25)),
+    )
+
 
 @app.get("/api/converted_markdowns")
 def get_converted_markdowns():

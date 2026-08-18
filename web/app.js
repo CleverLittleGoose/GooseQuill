@@ -10,6 +10,7 @@ import { initHeader, testApiConnection } from "./js/components/header.js";
 import { initFolderSidebar, renderSidebarFolders, renderStats } from "./js/components/folder_sidebar.js";
 import { initDocumentTable, renderDocuments, updateSelectedUI } from "./js/components/document_table.js";
 import { initViewerModal } from "./js/components/viewer_modal.js";
+import { initSearchView } from "./js/components/search_view.js";
 import { initCombinerModal, refreshCombinerAvailableFiles } from "./js/components/combiner_modal.js";
 import { initBatchModal, fetchBatchJobs } from "./js/components/batch_modal.js";
 import { initSettingsModal } from "./js/components/settings_modal.js";
@@ -68,6 +69,7 @@ async function init() {
   initFolderSidebar();
   initDocumentTable();
   initViewerModal();
+  initSearchView();
   initCombinerModal();
   initBatchModal();
   initSettingsModal();

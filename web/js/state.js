@@ -28,7 +28,7 @@ export const appState = {
   pricing: {},
   stats: {},
   // Workspace UI filter states
-  currentView: "workspace", // "workspace" | "combiner" | "batches" | "economics"
+  currentView: "workspace", // "workspace" | "studio" | "search" | "combiner" | "batches" | "economics"
   filterStatus: "all",      // "all" | "ready" | "converted" | "batch"
   searchQuery: "",
   folderSearchQuery: "",

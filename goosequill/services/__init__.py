@@ -9,6 +9,7 @@ from .conversion_engine import ConversionEngine
 from .batch_service import BatchService
 from .markdown_combiner import MarkdownCombinerService
 from .pricing_sync import PricingSyncService
+from .search_service import SearchService
 
 __all__ = [
     "PDFRenderer",
@@ -24,5 +25,6 @@ __all__ = [
     "ConversionEngine",
     "BatchService",
     "MarkdownCombinerService",
-    "PricingSyncService"
+    "PricingSyncService",
+    "SearchService"
 ]

@@ -396,7 +396,11 @@ export function initViewerModal() {
   }
 
   eventBus.on("modal:viewer:open", (doc) => openDocumentViewer(doc));
-  eventBus.on("studio:document:open", (doc) => openDocumentInStudio(doc));
+  eventBus.on("studio:document:open", (payload) => {
+    const doc = payload && payload.doc ? payload.doc : payload;
+    const startPage = payload && payload.startPage ? payload.startPage : 1;
+    if (doc) openDocumentInStudio(doc, { startPage });
+  });
   eventBus.on("studio:document:activated", () => {
     if (appState.currentViewingDoc) {
       renderStudioView();
@@ -687,7 +691,7 @@ function updateStudioOutlineActiveItem() {
 /**
  * Open document in full Document Studio Workspace
  */
-export async function openDocumentInStudio(doc) {
+export async function openDocumentInStudio(doc, { startPage = 1 } = {}) {
   setupDocState(doc);
 
   // Show Document Studio nav tab
@@ -699,6 +703,9 @@ export async function openDocumentInStudio(doc) {
   switchStudioView("studio");
   applyZoom();
   await loadAndRenderDoc(doc);
+
+  // Arriving from a search result means arriving at a page, not at page one.
+  if (startPage > 1) goToPage(startPage, true);
 }
 
 /**
