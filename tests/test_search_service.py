@@ -112,6 +112,40 @@ class TestSearchService(unittest.TestCase):
 
         self.assertEqual(self.service.search(self.test_dir, "sustainability")["total_matches"], 1)
 
+    def test_offset_walks_further_down_the_same_ranking(self):
+        """Paging must continue the ranking, not re-rank a different slice."""
+        everything = self.service.search(self.test_dir, "was", max_documents=50)
+        ordered = [r["markdown_path"] for r in everything["results"]]
+        self.assertGreaterEqual(len(ordered), 2, "fixture needs at least two matching documents")
+
+        first = self.service.search(self.test_dir, "was", max_documents=1, offset=0)
+        second = self.service.search(self.test_dir, "was", max_documents=1, offset=1)
+
+        self.assertEqual([r["markdown_path"] for r in first["results"]], ordered[:1])
+        self.assertEqual([r["markdown_path"] for r in second["results"]], ordered[1:2])
+
+    def test_has_more_reports_whether_anything_is_left(self):
+        total = self.service.search(self.test_dir, "was", max_documents=50)["documents_matched"]
+        self.assertGreater(total, 1)
+
+        self.assertTrue(self.service.search(self.test_dir, "was", max_documents=1)["has_more"])
+        last = self.service.search(self.test_dir, "was", max_documents=1, offset=total - 1)
+        self.assertFalse(last["has_more"])
+        self.assertEqual(last["offset"], total - 1)
+
+    def test_offset_past_the_end_is_empty_rather_than_an_error(self):
+        result = self.service.search(self.test_dir, "Revenue", offset=9999)
+        self.assertEqual(result["results"], [])
+        self.assertFalse(result["has_more"])
+        # The totals still describe the whole search, not the empty page.
+        self.assertGreater(result["documents_matched"], 0)
+
+    def test_offset_does_not_change_the_totals(self):
+        first = self.service.search(self.test_dir, "was", max_documents=1, offset=0)
+        second = self.service.search(self.test_dir, "was", max_documents=1, offset=1)
+        self.assertEqual(first["total_matches"], second["total_matches"])
+        self.assertEqual(first["documents_matched"], second["documents_matched"])
+
     def test_missing_root_is_not_an_error(self):
         result = self.service.search(self.test_dir / "nope", "anything")
         self.assertEqual(result["results"], [])

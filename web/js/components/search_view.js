@@ -14,12 +14,22 @@ import { eventBus } from "../state.js";
 import { findDocumentByPath } from "../services/document_catalog.js";
 import { showToast } from "../services/notifications.js";
 
+/**
+ * How many documents a page of results holds.
+ *
+ * The search always finds and ranks every match; this only decides how many
+ * arrive at once. It used to be a hard ceiling — "Showing the 100 documents
+ * with the most matches, of 118" — with no way to see the other eighteen.
+ */
+const PAGE_SIZE = 100;
+
 const state = {
   query: "",
   matchCase: false,
   wholeWord: false,
   running: false,
   requestToken: 0,
+  offset: 0,
   debounceTimer: null
 };
 
@@ -80,7 +90,7 @@ function scheduleSearch(value) {
   state.debounceTimer = setTimeout(() => runSearch(value), 250);
 }
 
-async function runSearch(rawQuery) {
+async function runSearch(rawQuery, { offset = 0, append = false } = {}) {
   const query = (rawQuery || "").trim();
   state.query = query;
 
@@ -93,25 +103,28 @@ async function runSearch(rawQuery) {
     return;
   }
 
+  state.offset = offset;
+
   // Every keystroke can start a request; only the newest one may paint.
   const token = ++state.requestToken;
   state.running = true;
-  if (summary) summary.textContent = "Searching…";
+  if (summary && !append) summary.textContent = "Searching…";
 
   try {
     const params = new URLSearchParams({
       q: query,
       match_case: String(state.matchCase),
       whole_word: String(state.wholeWord),
-      max_documents: "100",
-      max_matches_per_document: "5"
+      max_documents: String(PAGE_SIZE),
+      max_matches_per_document: "5",
+      offset: String(offset)
     });
     const res = await fetch(`/api/search?${params.toString()}`);
     if (!res.ok) throw new Error(`Search failed (${res.status})`);
     const data = await res.json();
 
     if (token !== state.requestToken) return;
-    renderResults(data, results, summary);
+    renderResults(data, results, summary, { append });
   } catch (error) {
     if (token !== state.requestToken) return;
     if (summary) summary.textContent = "";
@@ -132,7 +145,7 @@ function renderIdle(results, summary) {
   `;
 }
 
-function renderResults(data, container, summary) {
+function renderResults(data, container, summary, { append = false } = {}) {
   const { results, total_matches: total, documents_matched: matched, documents_searched: searched, truncated } = data;
 
   if (summary) {
@@ -141,7 +154,7 @@ function renderResults(data, container, summary) {
       : `${total.toLocaleString()} ${total === 1 ? "match" : "matches"} in ${matched} of ${searched} documents`;
   }
 
-  if (!results.length) {
+  if (!results.length && !append) {
     container.innerHTML = `
       <div class="search-empty">
         <div class="search-empty-icon">∅</div>
@@ -174,7 +187,7 @@ function renderResults(data, container, summary) {
       <div class="search-result-header">
         <div class="search-result-titles">
           <div class="search-result-name">${escapeHtml(doc.stem)}</div>
-          <div class="search-result-folder">📁 ${escapeHtml(doc.folder)}</div>
+          <div class="search-result-folder">${escapeHtml(doc.folder)}</div>
         </div>
         <span class="search-result-count">${doc.match_count} ${doc.match_count === 1 ? "match" : "matches"}</span>
       </div>
@@ -185,15 +198,37 @@ function renderResults(data, container, summary) {
     fragment.appendChild(card);
   });
 
-  container.innerHTML = "";
+  // A new search replaces what is on screen; "load more" adds to it.
+  if (!append) container.innerHTML = "";
+  container.querySelector(".search-load-more")?.remove();
   container.appendChild(fragment);
 
-  if (truncated) {
-    const note = document.createElement("div");
-    note.className = "search-result-more text-muted text-xs";
-    note.style.textAlign = "center";
-    note.textContent = `Showing the 100 documents with the most matches, of ${matched}.`;
-    container.appendChild(note);
+  // Derived rather than taken on trust: the count on screen against the count
+  // that matched is the same question the server answers with `has_more`, and
+  // computing it here means a server that has not been restarted since this
+  // shipped degrades to a correct answer instead of a wrong one.
+  const shown = (data.offset || 0) + results.length;
+  if (shown < matched) {
+    const more = document.createElement("div");
+    more.className = "search-load-more";
+    more.innerHTML = `
+      <button class="btn btn-secondary" type="button">
+        Load more documents
+      </button>
+      <span class="text-muted text-xs">${shown.toLocaleString()} of ${matched.toLocaleString()} documents shown</span>
+    `;
+    const button = more.querySelector("button");
+    button.addEventListener("click", () => {
+      button.disabled = true;
+      button.textContent = "Loading…";
+      runSearch(state.query, { offset: shown, append: true });
+    });
+    container.appendChild(more);
+  } else if (matched > PAGE_SIZE) {
+    const done = document.createElement("div");
+    done.className = "search-load-more";
+    done.innerHTML = `<span class="text-muted text-xs">All ${matched.toLocaleString()} matching documents shown</span>`;
+    container.appendChild(done);
   }
 
   container.querySelectorAll(".search-snippet").forEach((btn) => {

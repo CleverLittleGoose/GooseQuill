@@ -11,6 +11,16 @@ _PAGE_MARKER_RE = re.compile(r"<!--\s*Page\s+(\d+)\s*-->", re.IGNORECASE)
 # How much text to show either side of a hit.
 _SNIPPET_RADIUS = 70
 
+# Where consolidated output lives. A consolidation is a copy of text that is
+# already in the workspace, so counting it as another document means every hit
+# in it is a hit you have already been shown somewhere else.
+CONSOLIDATED_DIR_NAME = "Consolidated"
+
+
+def is_consolidated(path: Path) -> bool:
+    """Whether a Markdown file is combiner output rather than a transcript."""
+    return CONSOLIDATED_DIR_NAME in Path(path).parts
+
 
 class SearchService:
     """Full-text search across every converted Markdown document in a workspace.
@@ -30,12 +40,22 @@ class SearchService:
     # ------------------------------------------------------------------ files
 
     @staticmethod
-    def iter_markdown_files(root_dir: Path) -> List[Path]:
-        """Every converted Markdown document beneath a workspace root."""
+    def iter_markdown_files(root_dir: Path, include_consolidated: bool = False) -> List[Path]:
+        """Every converted Markdown document beneath a workspace root.
+
+        Consolidated output is left out by default: its contents are a copy of
+        documents already being searched, so including it reports the same
+        passage two or three times over and pushes the originals down the
+        ranking beneath the file that quotes them all.
+        """
         root = Path(root_dir)
         if not root.exists():
             return []
-        return sorted(p for p in root.rglob("*.md") if p.is_file())
+        return sorted(
+            p
+            for p in root.rglob("*.md")
+            if p.is_file() and (include_consolidated or not is_consolidated(p))
+        )
 
     def _load(self, path: Path) -> Optional[Tuple[str, List[int], List[int]]]:
         """Read a document and its page boundaries, honouring the cache."""
@@ -115,8 +135,17 @@ class SearchService:
         whole_word: bool = False,
         max_documents: int = 100,
         max_matches_per_document: int = 5,
+        offset: int = 0,
+        include_consolidated: bool = False,
     ) -> Dict[str, Any]:
-        """Find a query across the workspace, grouped by document."""
+        """Find a query across the workspace, grouped by document.
+
+        `offset` walks further down the same ranking rather than re-running a
+        different search. Every matching document is found and ranked either
+        way — the limit only decides how many are returned — and the contents
+        cache means paging through results does no file I/O at all after the
+        first page.
+        """
         query = (query or "").strip()
         if not query:
             return {
@@ -126,6 +155,8 @@ class SearchService:
                 "documents_matched": 0,
                 "documents_searched": 0,
                 "truncated": False,
+                "offset": 0,
+                "has_more": False,
             }
 
         pattern_text = re.escape(query)
@@ -133,7 +164,7 @@ class SearchService:
             pattern_text = rf"\b{pattern_text}\b"
         pattern = re.compile(pattern_text, 0 if match_case else re.IGNORECASE)
 
-        files = self.iter_markdown_files(root_dir)
+        files = self.iter_markdown_files(root_dir, include_consolidated=include_consolidated)
         results: List[Dict[str, Any]] = []
         total_matches = 0
 
@@ -173,13 +204,18 @@ class SearchService:
         # Most hits first: the document that talks about it most is the one
         # someone searching for it usually wants.
         results.sort(key=lambda r: (-r["match_count"], r["folder"].lower(), r["name"].lower()))
-        truncated = len(results) > max_documents
+
+        start = max(0, offset)
+        page = results[start : start + max_documents]
 
         return {
             "query": query,
-            "results": results[:max_documents],
+            "results": page,
             "total_matches": total_matches,
             "documents_matched": len(results),
             "documents_searched": len(files),
-            "truncated": truncated,
+            # Kept for callers that only ask "is there more than I was given".
+            "truncated": len(results) > max_documents,
+            "offset": start,
+            "has_more": start + len(page) < len(results),
         }
