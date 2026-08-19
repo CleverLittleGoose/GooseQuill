@@ -19,6 +19,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from goosequill.models import PricingRegistry
+from goosequill.services.search_service import CONSOLIDATED_DIR_NAME
 from goosequill.services import (
     ConversionEngine,
     PDFRenderer,
@@ -105,6 +106,27 @@ def run_convert(args):
     print("\n✨ All conversions completed successfully!\n")
 
 
+def _combinable(md_infos, args):
+    """Drop previous consolidations unless they were explicitly asked for.
+
+    A consolidation contains every document it was made from, so `--all` picking
+    them up means each of those documents appears twice and the output grows
+    every time it is regenerated. `--files` is left alone: naming a file is
+    asking for it.
+    """
+    include = getattr(args, "include_consolidated", False)
+    kept, skipped = [], 0
+    for info in md_infos:
+        if info.get("is_consolidated") and not include:
+            skipped += 1
+            continue
+        kept.append(Path(info["path"]))
+
+    if skipped:
+        print(f" Skipped {skipped} previously consolidated file(s). Use --include-consolidated to keep them.")
+    return kept
+
+
 def run_combine(args):
     """Execute markdown consolidation command."""
     doc_repo = DocumentRepository()
@@ -127,11 +149,11 @@ def run_combine(args):
                 folder_path = Path.cwd() / args.folder
 
         md_infos = doc_repo.get_converted_markdowns(folder_path)
-        files_to_combine = [Path(m["path"]) for m in md_infos]
+        files_to_combine = _combinable(md_infos, args)
     else:
         # Default / --all
         md_infos = doc_repo.get_converted_markdowns(DEFAULT_ACCOUNTS_DIR)
-        files_to_combine = [Path(m["path"]) for m in md_infos]
+        files_to_combine = _combinable(md_infos, args)
 
     if not files_to_combine:
         print("No converted Markdown files found to combine.", file=sys.stderr)
@@ -169,9 +191,9 @@ def run_combine(args):
         if not output_path_str:
             if args.folder:
                 folder_p = Path(args.folder)
-                output_path_str = str(folder_p / f"{folder_p.name}_Consolidated.md")
+                output_path_str = str(folder_p / CONSOLIDATED_DIR_NAME / f"{folder_p.name}_Consolidated.md")
             else:
-                output_path_str = str(DEFAULT_ACCOUNTS_DIR / "Consolidated_Master_Accounts.md")
+                output_path_str = str(DEFAULT_ACCOUNTS_DIR / CONSOLIDATED_DIR_NAME / "Consolidated_Master_Accounts.md")
 
         out_file = MarkdownCombinerService.save_combined_document(output_path_str, result["content"])
 
@@ -223,6 +245,11 @@ def main():
     combine_parser.add_argument("--files", nargs="+", default=None, help="Specific markdown or PDF files to combine")
     combine_parser.add_argument("--all", action="store_true", help="Combine all converted markdowns in workspace")
     combine_parser.add_argument("--output", "-o", type=str, default=None, help="Destination output path")
+    combine_parser.add_argument(
+        "--include-consolidated",
+        action="store_true",
+        help="Also combine previously consolidated files (off by default: they already contain their sources)"
+    )
     combine_parser.add_argument("--title", type=str, default=None, help="Master document title")
     combine_parser.add_argument(
         "--sort",
