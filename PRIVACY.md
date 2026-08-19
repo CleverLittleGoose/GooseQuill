@@ -96,6 +96,12 @@ use of the API is a matter between you and Google; we are not a party to it.
   reprocessing.
 - **Batch job records** (`.cache/batches/`) — job IDs and file paths for
   asynchronous jobs.
+- **Search results** — workspace search reads every converted Markdown file
+  beneath your documents folder and keeps their text in memory while the server
+  is running, so repeat searches don't re-read the disk. It is held in the
+  process, never written to a separate index file, and discarded when you stop
+  the server. Nothing is sent anywhere: searching is a local file read and a
+  regular expression, with no network request of any kind.
 - **Your API key** (`.env`) — read at startup, never logged, never written
   anywhere else, and never transmitted to anyone but Google. `.env` is
   gitignored; keep it that way.
@@ -150,4 +156,4 @@ This paragraph is a signpost, not legal advice.
 Open an issue on this repository, or write to
 [hello@cleverlittlegoose.com](mailto:hello@cleverlittlegoose.com).
 
-*Last updated: 18 August 2026.*
+*Last updated: 19 August 2026.*
