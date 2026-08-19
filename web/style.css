@@ -48,6 +48,9 @@
   --shadow-lg: 0 14px 32px -4px rgba(0, 0, 0, 0.7);
   --shadow-dock: 0 16px 40px -6px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.1);
 
+  /* Drawn once, used wherever a folder needs marking. */
+  --icon-folder: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'/%3E%3C/svg%3E");
+
   --transition-fast: 0.15s ease;
   --transition-normal: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -2348,19 +2351,48 @@ input[type="checkbox"]:focus-visible {
 }
 
 /*
- * The diff mode control states what is being compared rather than offering a
- * choice between two things named in the abstract, because "Markdown" and
- * "Words" only mean something once you can see which one you are looking at.
+ * Drawn icons, not typed ones.
+ *
+ * Emoji were doing this job — 🖼️ ⇔ ⚡ 🔗 ± 🔍 💾 ⧉ ⬇ — and they cannot be made
+ * to belong: each platform draws them differently, they carry their own colour
+ * regardless of the theme, they ignore stroke weight, and they sit on the text
+ * baseline rather than optically centred against a label.
  */
-.diff-mode-btn {
-  font-variant: small-caps;
-  letter-spacing: 0.04em;
-  border-style: dashed;
+.btn-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.diff-mode-btn::before {
-  content: "vs ";
+.btn-sm .btn-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/*
+ * The comparison mode reads as a sentence: "Comparing [text and formatting]".
+ * It was a chip saying "vs MARKDOWN", which named a thing without saying what
+ * choosing it would do to the comparison in front of you.
+ */
+.studio-diff-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
   color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.studio-diff-mode .form-select-sm {
+  width: auto;
+  min-width: 0;
+  padding: 4px 24px 4px 8px;
+  font-size: 12.5px;
 }
 
 .studio-workspace-body {
@@ -2457,12 +2489,7 @@ input[type="checkbox"]:focus-visible {
 }
 
 #tabNavStudioDocName {
-  display: inline-block;
-  max-width: 190px;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-  vertical-align: bottom;
 }
 
 .studio-nav {
@@ -2837,14 +2864,21 @@ body.is-resizing-panes .studio-pane {
   gap: 8px;
 }
 
+/*
+ * Sized like the main thing on the screen, because it is.
+ *
+ * This view exists to search 12,000 pages, and its input was the same height
+ * as the filter box in the sidebar — a control that filters a visible list.
+ * The two do very different jobs and should not look interchangeable.
+ */
 .search-view-input-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 6px 10px;
+  padding: 10px 16px;
 }
 
 .search-view-input-group:focus-within {
@@ -2855,6 +2889,8 @@ body.is-resizing-panes .studio-pane {
 .search-view-input-group .search-icon {
   color: var(--text-muted);
   flex-shrink: 0;
+  width: 20px;
+  height: 20px;
 }
 
 .search-view-input-group .form-input {
@@ -2862,8 +2898,8 @@ body.is-resizing-panes .studio-pane {
   min-width: 0;
   border: none;
   background: transparent;
-  padding: 6px 0;
-  font-size: 15px;
+  padding: 8px 0;
+  font-size: 18px;
   outline: none;
 }
 
@@ -3225,7 +3261,7 @@ body.is-resizing-panes .studio-pane {
    a glance and stays complete in the tooltip and in Settings. */
 .status-pill {
   min-width: 0;
-  max-width: 168px;
+  max-width: 148px;
   overflow: hidden;
 }
 
@@ -3249,6 +3285,17 @@ body.is-resizing-panes .studio-pane {
 .studio-nav:not([data-overflowing="true"]) {
   -webkit-mask-image: none;
   mask-image: none;
+}
+
+/*
+ * Below this the nav tabs drop their icons and keep their words. Every tab is
+ * labelled, so the icon is decoration — and a decoration that costs about
+ * 130px is what pushed "Costs" off the end of the bar when Studio joined it.
+ */
+@media (max-width: 1400px) {
+  .studio-tab-btn > svg {
+    display: none;
+  }
 }
 
 @media (max-width: 1180px) {
@@ -3322,11 +3369,123 @@ body.is-resizing-panes .studio-pane {
   }
 }
 
-/* Says when the consolidated preview is showing only the opening pages. */
+/* Says what the consolidated preview is showing, and offers the rest. */
 .combiner-preview-notice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   padding: 8px 16px;
   font-size: 13px;
   color: var(--accent-amber);
   background: rgba(245, 158, 11, 0.1);
   border-bottom: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.combiner-preview-notice .btn {
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   STUDIO EMPTY STATE
+
+   Studio used to appear in the nav only once a document was open, which made
+   it feel like a mode you fell into rather than a place you could go. It is
+   always there now, so it needs something to say when it is empty.
+   ========================================================================== */
+.studio-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.studio-empty svg {
+  opacity: 0.32;
+  margin-bottom: 10px;
+}
+
+.studio-empty h2 {
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.studio-empty p {
+  max-width: 430px;
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+
+.studio-empty .btn {
+  margin-top: 14px;
+}
+
+.studio-empty-hint {
+  margin-top: 10px;
+  font-size: 12.5px;
+}
+
+.studio-empty-hint kbd {
+  display: inline-block;
+  min-width: 18px;
+  margin: 0 1px;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);
+}
+
+/*
+ * A folder mark for the entity label under a filing name.
+ *
+ * This was a 📁 in the text, which meant it changed shape between machines,
+ * ignored the muted colour around it, and could not be sized against the text
+ * it sat beside.
+ */
+.doc-entity-tag,
+.search-result-folder,
+.combiner-item-folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.doc-entity-tag::before,
+.search-result-folder::before,
+.combiner-item-folder::before {
+  content: "";
+  flex-shrink: 0;
+  width: 11px;
+  height: 11px;
+  background-color: currentColor;
+  -webkit-mask: var(--icon-folder) center / contain no-repeat;
+  mask: var(--icon-folder) center / contain no-repeat;
+}
+
+/* Paging through results, rather than being told there are more and stopping. */
+.search-load-more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 22px 0 8px;
+}
+
+/* Which document the find bar is searching. Only shown with two open. */
+.search-pane-picker {
+  flex-shrink: 0;
+}
+
+.search-pane-picker .btn {
+  min-width: 26px;
+  padding: 3px 8px;
+  font-weight: 600;
 }
