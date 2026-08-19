@@ -126,11 +126,21 @@ export function renderTabStrip({ onSelect, onClose }) {
   });
 }
 
-/** Keep the top-nav Studio button naming whatever is open. */
+/**
+ * Keep the top-nav Studio button current.
+ *
+ * It shows how many documents are open, not which — a filename there is
+ * unbounded, and a long one pushed the last nav items off the bar. The strip
+ * below names them, and names them all rather than only the active one.
+ */
 export function updateNavTabLabel() {
-  const tab = activeTab();
   const nameEl = dom.byId("tabNavStudioDocName");
   const badge = dom.byId("topNavStudioDocBadge");
-  if (nameEl && tab) nameEl.textContent = tab.doc.name;
-  if (badge) badge.textContent = tabs.length > 1 ? `${tabs.length} open` : "Active";
+
+  if (nameEl) nameEl.textContent = "Studio";
+  if (badge) {
+    badge.style.display = tabs.length ? "inline-flex" : "none";
+    badge.textContent = tabs.length > 1 ? String(tabs.length) : "1";
+    badge.title = tabs.length === 1 ? "One document open" : `${tabs.length} documents open`;
+  }
 }

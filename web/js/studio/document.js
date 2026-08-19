@@ -20,9 +20,6 @@ import { setDiffEnabled, clearDiffCache } from "./diff.js";
 
 /** Open a document in the Studio, or go to it if it is already open. */
 export async function openDocumentInStudio(doc, { startPage = 1 } = {}) {
-  const navTab = dom.byId("tabNavStudio");
-  if (navTab) navTab.style.display = "inline-flex";
-
   switchStudioView("studio");
   applyZoom();
 
@@ -35,6 +32,7 @@ export async function openDocumentInStudio(doc, { startPage = 1 } = {}) {
 
   tabs.captureActivePosition();
   await activateTab(tabs.openTab(doc, startPage), startPage);
+  updateStudioPresence();
 }
 
 export async function activateTab(index, startPage = null) {
@@ -47,6 +45,7 @@ export async function activateTab(index, startPage = null) {
   setupDocState(tab.doc);
   renderTabStrip();
   tabs.updateNavTabLabel();
+  updateStudioPresence();
 
   if (tab.content) {
     // Already loaded once; restore it rather than fetching again.
@@ -77,9 +76,7 @@ export function closeTab(index) {
 
   if (outcome.empty) {
     renderTabStrip();
-    const navTab = dom.byId("tabNavStudio");
-    if (navTab) navTab.style.display = "none";
-    switchStudioView("workspace");
+    updateStudioPresence();
     return;
   }
 
@@ -154,8 +151,30 @@ async function loadAndRender(doc) {
   }
 }
 
+/**
+ * Show either the Studio proper or its empty state.
+ *
+ * Studio is a permanent destination now, so it can be reached with nothing
+ * open — from the nav, or by closing the last tab and coming back.
+ */
+export function updateStudioPresence() {
+  const empty = dom.byId("studioEmptyState");
+  const workspace = dom.byId("studioWorkspaceContainer");
+  const hasDocument = tabs.tabs.length > 0;
+
+  if (empty) empty.style.display = hasDocument ? "none" : "flex";
+  if (workspace) workspace.style.display = hasDocument ? "flex" : "none";
+
+  const badge = dom.byId("topNavStudioDocBadge");
+  if (badge) badge.style.display = hasDocument ? "inline-flex" : "none";
+  const name = dom.byId("tabNavStudioDocName");
+  if (name && !hasDocument) name.textContent = "Studio";
+}
+
 /** Redraw everything for the document already in state. */
 export function renderStudioView() {
+  updateStudioPresence();
+  if (tabs.tabs.length === 0) return;
   renderPageList({ onSelect: (page) => goToPage(page, true) });
   updateDisplay();
   applyZoom();
