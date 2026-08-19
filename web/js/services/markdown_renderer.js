@@ -2,7 +2,7 @@
  * Object-Oriented Markdown Rendering Service for GooseQuill
  * Encapsulates an isolated marked.Marked instance and DOMPurify sanitization.
  */
-class MarkdownRenderer {
+export class MarkdownRenderer {
   constructor(options = {}) {
     this.options = {
       gfm: true,
@@ -181,7 +181,42 @@ class MarkdownRenderer {
       (match, prefix, inner) => (inner.includes("```") ? match : `${prefix}\n${inner}\n`)
     );
 
-    return MarkdownRenderer.unwrapWholeDocumentFence(processed);
+    return MarkdownRenderer.unwrapWholeDocumentFence(
+      MarkdownRenderer.collapseRuleRuns(processed)
+    );
+  }
+
+  /**
+   * Turn an OCR'd rule back into a rule.
+   *
+   * A signature line, a dotted leader or a table border comes back from the
+   * model as the characters it saw: one page of a filing produced a 6,402
+   * character run of "- - - - - ". Markdown reads every "- " as a list item, so
+   * that one artefact became thousands of empty bullets, filled the pane, and
+   * pushed the rest of the page off the bottom.
+   *
+   * This is not an attempt to anticipate everything the model might do — it
+   * cannot be. It bounds the damage from one common shape: a line that is
+   * nothing but separator characters is a rule, however long it runs, and there
+   * is no information in the length of it. The file on disk is untouched; this
+   * is what gets displayed.
+   */
+  static collapseRuleRuns(text) {
+    if (!text) return text;
+
+    // Anything from this many separator characters on a line is scenery.
+    const MIN_RUN = 24;
+
+    return text
+      .split("\n")
+      .map((line) => {
+        const trimmed = line.trim();
+        if (trimmed.length < MIN_RUN) return line;
+        // Only separator characters and the spaces between them.
+        if (!/^[-–—_.·•*=~]+(?:[ \t]*[-–—_.·•*=~]+)*$/.test(trimmed)) return line;
+        return "---";
+      })
+      .join("\n");
   }
 
   /**
