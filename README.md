@@ -15,13 +15,16 @@ Built for dense statutory financial statements, balance sheets, legal filings, t
 - **Interactive Web Interface**:
   - Drag-and-drop PDF uploader.
   - Document & folder explorer with live status indicators.
-  - Side-by-side verification viewer (Original Scanned PDF Page vs. Rendered Markdown / Raw Markdown).
-  - Markdown Consolidation & Combiner Studio with live split preview, smart chronological/alphabetical sorting, Table of Contents generation, and instant export.
+  - Document Studio: the transcript beside the page it came from, with a page index, find-in-document, and several documents open at once as tabs.
+  - Compare two filings side by side, with change highlighting across years of the same entity — over the Markdown as written, or over the words it renders to.
+  - Workspace-wide search across every converted document, showing the page each match sits on.
+  - Markdown Consolidation & Combiner Studio with live preview, smart chronological/alphabetical sorting, Table of Contents generation, and instant export.
+  - Keyboard-driven: `Cmd/Ctrl+K` to open a document, `?` for the full list.
   - Rich Model Picker with live specification & rate cards (Standard, Batch 50% off, Context caching).
   - Customizable OCR prompts and presets (Financial Statements, Dense Tables, General Documents).
   - Asynchronous Batch API jobs with 50% discount.
 - **Object-Oriented Architecture**: Modular `goosequill` Python package with typed dataclasses, single-responsibility services, and decoupled testing.
-- **Standalone CLI Tools**: Simple command-line tools for automated conversions (`convert_reports_to_markdown.py`) and markdown consolidation (`combine_markdown.py`).
+- **Standalone CLI Tools**: `cli.py convert`, `cli.py combine` and `cli.py serve`, plus the simpler `convert_reports_to_markdown.py` and `combine_markdown.py` scripts.
 
 ---
 
@@ -159,6 +162,19 @@ skip straight to launching.
 Drop your PDFs into the `documents/` folder — or use the in-app uploader, or
 point the app at any folder on your machine from **Settings → Working Directory**.
 
+If GooseQuill is already running, `./launch.sh` opens the browser at it rather
+than trying to start a second copy. If something else holds the port, it tells
+you what.
+
+#### Environment variables
+
+| Variable | Default | What it does |
+|---|---|---|
+| `GOOSEQUILL_PORT` | `8000` | Port to serve on. |
+| `GOOSEQUILL_HOST` | `127.0.0.1` | Bind address. Leave it alone unless you have read [SECURITY.md](SECURITY.md) — the API is unauthenticated. |
+| `GOOSEQUILL_RELOAD` | `0` | `1` restarts the server when the code changes. Watches the code only, not your documents. |
+| `GOOSEQUILL_VERBOSE_ACCESS` | `0` | `1` logs every request. Off, page images and static assets are logged only when they fail. |
+
 ### Notes on privacy and security
 
 **Your documents are sent to Google's Gemini API** — that is how GooseQuill reads
@@ -250,7 +266,16 @@ python combine_markdown.py --all --output "All_Documents_Master.md"
 
 Converted markdown files are saved directly in a `Markdown/` subfolder alongside the original PDF:
 - `<document_folder>/Markdown/<pdf_name>.md`
-- Consolidated outputs: `<document_folder>/Markdown/<combined_name>.md`
+- Consolidated outputs: `<document_folder>/Consolidated/<combined_name>.md`
+
+Consolidations live in their own folder because a consolidation contains every
+document it was made from. Beside the transcripts they counted as converted
+documents, appeared in the list of things to consolidate — so combining a folder
+swept up yesterday's combination of it — and matched every search twice.
+
+If you have consolidations from an earlier version sitting in `Markdown/`,
+`python migrate_consolidated.py` will show you what would move, and
+`--apply` moves it.
 
 ---
 
