@@ -704,6 +704,59 @@ function resetCombinerStats() {
  * headers look right — and interrupting that with a wall was the wrong way
  * round.
  */
+/**
+ * What a completed full build looks like.
+ *
+ * The document is on disk and is not coming back through the tab, so there is
+ * nothing to render — and nothing to render is the point. What is useful here
+ * is where it went, how big it turned out, and a way to get it.
+ */
+function renderBuiltDocument(data) {
+  const notice = document.getElementById("studioCombinerPreviewNotice");
+  if (notice) {
+    notice.style.display = "none";
+    notice.innerHTML = "";
+  }
+
+  appState.combiner.previewIsPartial = false;
+  updateCombinerOutputButtons({ builtPath: data.saved_path });
+
+  const stats = [
+    [ "studioCombinerStatDocs", data.total_documents ],
+    [ "studioCombinerStatPages", data.total_pages ],
+    [ "studioCombinerStatWords", (data.total_words || 0).toLocaleString() ],
+    [ "studioCombinerStatChars", (data.total_chars || 0).toLocaleString() ]
+  ];
+  stats.forEach(([id, value]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  });
+
+  const megabytes = ((data.total_chars || 0) / 1048576).toFixed(1);
+
+  clearCombinerPreviewBody(`
+    <div style="padding: 56px 20px; text-align: center;">
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--text-main);">Document built</h3>
+      <p class="text-muted" style="margin: 8px auto 4px; font-size: 14px; max-width: 460px;">
+        ${(data.total_documents || 0).toLocaleString()} documents,
+        ${(data.total_pages || 0).toLocaleString()} pages, about ${megabytes}MB.
+      </p>
+      <p class="text-muted text-xs" style="margin: 0 auto 18px; max-width: 520px; word-break: break-all;">
+        ${escapeForHtml(data.saved_path || "")}
+      </p>
+      <a class="btn btn-primary" id="studioCombinerBuiltDownload"
+         href="/api/download_markdown?path=${encodeURIComponent(data.saved_path || "")}">Download .md</a>
+      <p class="text-muted text-xs" style="margin-top: 14px;">
+        Too large to preview in the browser — that is why it was assembled on disk.
+      </p>
+    </div>
+  `);
+}
+
+function escapeForHtml(text) {
+  return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function renderPreviewNotice(notice, { previewedDocuments, totalDocuments, totalPages }) {
   if (!notice) return;
 
@@ -780,18 +833,28 @@ function clearCombinerPreviewBody(html) {
  * sends the file list and the server assembles and writes it, which is the
  * whole point of it being the server's job.
  */
-function updateCombinerOutputButtons() {
+function updateCombinerOutputButtons({ builtPath = null } = {}) {
   const partial = Boolean(appState.combiner.previewIsPartial);
-  [
-    document.getElementById("studioCombinerCopyBtn"),
-    document.getElementById("studioCombinerDownloadBtn")
-  ].forEach((btn) => {
-    if (!btn) return;
-    btn.disabled = partial;
-    btn.title = partial
+  const copyBtn = document.getElementById("studioCombinerCopyBtn");
+  const downloadBtn = document.getElementById("studioCombinerDownloadBtn");
+
+  if (copyBtn) {
+    // The clipboard route goes through a JavaScript string, so it stays shut
+    // for a document that was deliberately never brought into the tab.
+    copyBtn.disabled = partial || Boolean(builtPath);
+    copyBtn.title = builtPath
+      ? "The full document is on disk — download it rather than routing it through the clipboard"
+      : partial
+        ? "Build the full document first — the preview is only an extract"
+        : "";
+  }
+
+  if (downloadBtn) {
+    downloadBtn.disabled = partial && !builtPath;
+    downloadBtn.title = downloadBtn.disabled
       ? "Build the full document first — the preview is only an extract"
       : "";
-  });
+  }
 }
 
 /**
@@ -846,6 +909,7 @@ export async function generateCombinerPreview({ full = false } = {}) {
       <span class="spinner" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 8px;"></span>
       ${full ? "Building the full document" : "Preparing a preview"} —
       ${previewFiles.length.toLocaleString()} ${previewFiles.length === 1 ? "document" : "documents"}…
+      ${full ? '<div class="text-xs" style="margin-top: 10px;">Assembled and written on the server; this can take a moment for a large workspace.</div>' : ""}
     </div>
   `);
 
@@ -862,7 +926,10 @@ export async function generateCombinerPreview({ full = false } = {}) {
         include_source_meta: includeSourceMeta ? includeSourceMeta.checked : true,
         strip_original_headers: stripHeaders ? stripHeaders.checked : true,
         sort_mode: "custom",
-        save_to_disk: false
+        // A full build is written on the server. Anything smaller comes back
+        // so the raw pane and the preview have something to show.
+        save_to_disk: full,
+        return_content: !full
       })
     });
 
@@ -870,6 +937,11 @@ export async function generateCombinerPreview({ full = false } = {}) {
     if (!res.ok) throw new Error(data.detail || "Consolidation preview failed");
 
     appState.combiner.cachedResult = data;
+
+    if (full) {
+      renderBuiltDocument(data);
+      return;
+    }
 
     renderCombinerPreviewBody(data.content, {
       previewedDocuments: previewFiles.length,
