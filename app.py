@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import json
 import hashlib
@@ -10,7 +11,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 from goosequill.models import (
@@ -712,7 +713,78 @@ def combine_markdown(req: CombineMarkdownRequest):
         logger.exception("Error in combine_markdown")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Mount static web directory
+# ==============================================================================
+# THE PAGE
+# ==============================================================================
+#
+# index.html was 1,143 lines holding six views and four dialogs, which made it
+# the last place in the codebase where everything lived together. The views are
+# separate files now, and this stitches them back into one document at request
+# time.
+#
+# Composing on the server rather than fetching partials from the browser keeps
+# it a single response — no extra round trips, no flash of a half-built page,
+# and nothing for the frontend to know about.
+
+_INCLUDE_RE = re.compile(r'^([ \t]*)<!--#include file="([^"]+)"\s*-->[ \t]*$', re.MULTILINE)
+
+# path -> (mtime_ns, text). Rebuilt when any part of the page changes, so
+# editing a view is visible on reload without restarting anything.
+_page_cache: Dict[str, Any] = {"signature": None, "html": None}
+
+
+def _page_parts() -> List[Path]:
+    shell = WEB_DIR / "index.html"
+    return [shell] + sorted((WEB_DIR / "views").glob("*.html")) + sorted((WEB_DIR / "modals").glob("*.html"))
+
+
+def _page_signature() -> tuple:
+    signature = []
+    for part in _page_parts():
+        try:
+            signature.append((str(part), part.stat().st_mtime_ns))
+        except OSError:
+            signature.append((str(part), None))
+    return tuple(signature)
+
+
+def compose_index_html() -> str:
+    """Build index.html from its shell and the view files it includes."""
+    signature = _page_signature()
+    if _page_cache["signature"] == signature and _page_cache["html"] is not None:
+        return _page_cache["html"]
+
+    shell = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+
+    def replace(match: "re.Match") -> str:
+        relative = match.group(2)
+        # Includes name files inside web/; nothing else is reachable.
+        part = (WEB_DIR / relative).resolve()
+        if not str(part).startswith(str(WEB_DIR.resolve())) or not part.is_file():
+            logger.error("Unknown include in index.html: %s", relative)
+            return f"<!-- missing include: {relative} -->"
+        # Spliced verbatim: the parts keep the indentation they were cut with,
+        # so the assembled document is the file that was split, not a
+        # re-formatted approximation of it. The marker's own indent is ignored.
+        return part.read_text(encoding="utf-8").rstrip("\n")
+
+    html = _INCLUDE_RE.sub(replace, shell)
+    _page_cache["signature"] = signature
+    _page_cache["html"] = html
+    return html
+
+
+@app.get("/", include_in_schema=False)
+def index_page():
+    return HTMLResponse(compose_index_html())
+
+
+@app.get("/index.html", include_in_schema=False)
+def index_page_explicit():
+    return HTMLResponse(compose_index_html())
+
+
+# Everything else in web/ is served as-is. Mounted last so the routes above win.
 WEB_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="web")
 

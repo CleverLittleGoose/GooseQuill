@@ -1,0 +1,29 @@
+      <!-- ========================================== -->
+      <!-- VIEW: WORKSPACE-WIDE FULL TEXT SEARCH     -->
+      <!-- ========================================== -->
+      <div class="studio-view" id="viewSearch" style="display: none;">
+        <div class="search-view-container">
+          <div class="search-view-header">
+            <div class="search-view-input-group">
+              <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input
+                type="search"
+                id="workspaceSearchInput"
+                class="form-input"
+                placeholder="Find a phrase across every converted document…"
+                autocomplete="off"
+                spellcheck="false"
+                aria-label="Search all documents"
+              />
+              <button class="search-case-btn" id="workspaceSearchCaseBtn" title="Match case" aria-label="Match case" aria-pressed="false">Aa</button>
+              <button class="search-case-btn" id="workspaceSearchWordBtn" title="Whole words only" aria-label="Whole words only" aria-pressed="false">|ab|</button>
+              <button class="btn btn-sm btn-secondary" id="workspaceSearchClearBtn" title="Clear the search">Clear</button>
+            </div>
+            <div class="search-view-summary" id="workspaceSearchSummary" role="status" aria-live="polite"></div>
+          </div>
+          <div class="search-view-results" id="workspaceSearchResults"></div>
+        </div>
+      </div>

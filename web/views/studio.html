@@ -1,0 +1,223 @@
+      <!-- ========================================== -->
+      <!-- VIEW 5: DEDICATED DOCUMENT STUDIO         -->
+      <!-- ========================================== -->
+      <div class="studio-view" id="viewStudio" style="display: none;">
+        <!--
+          Studio with nothing open. It is a permanent destination in the nav
+          now, so it has to answer "what is this?" for someone who arrived here
+          before opening anything.
+        -->
+        <div class="studio-empty" id="studioEmptyState" style="display: none;">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          <h2>Read a document against its scan</h2>
+          <p>
+            Open a converted filing to see its transcript beside the page it came from,
+            search inside it, or compare it with another year.
+          </p>
+          <button class="btn btn-primary" id="studioEmptyOpenBtn">Open a document</button>
+          <p class="studio-empty-hint">or press <kbd>⌘</kbd><kbd>K</kbd> from anywhere</p>
+        </div>
+
+        <div class="studio-workspace-container" id="studioWorkspaceContainer">
+          <!-- Studio Sub-Header & Controls Bar -->
+          <div class="studio-sub-header">
+            <div class="studio-doc-meta">
+              <button class="btn btn-sm btn-secondary" id="studioBackToWorkspaceBtn" title="Back to Documents Workspace">
+                &larr; Workspace
+              </button>
+              <div class="studio-doc-picker">
+                <div class="studio-doc-picker-row">
+                  <span class="compare-pane-label">A</span>
+                  <select id="studioDocSelect" class="form-select form-select-sm compare-doc-select" aria-label="Choose the document for pane A"></select>
+                </div>
+                <span class="text-xs text-muted" id="studioDocMeta">Pages • Size</span>
+              </div>
+            </div>
+            <!--
+              Grouped rather than flat. Twelve controls of identical weight in
+              one row gave no clue which of them changed what you were reading,
+              which turned something on beside it, or which wrote to disk.
+            <!--
+              Grouped, and captioned rather than pictographic. Twelve controls
+              of identical weight in one row gave no clue which of them changed
+              what you were reading, which turned something on beside it, and
+              which wrote to disk. Icons are drawn rather than typed: emoji
+              render differently on every platform, carry their own colour, and
+              cannot be made to match anything around them.
+            -->
+            <div class="studio-header-actions">
+              <div class="studio-toolbar-group" role="group" aria-label="What to show">
+                <div class="btn-group">
+                  <button class="btn btn-sm btn-secondary active" id="studioFormatRenderedBtn" title="Read the transcript as formatted text">Rendered</button>
+                  <button class="btn btn-sm btn-secondary" id="studioFormatRawBtn" title="Read and edit the Markdown behind it">Markdown</button>
+                </div>
+                <div class="btn-group">
+                  <button class="btn btn-sm btn-secondary active" id="studioScopeAllBtn" title="Show the whole document">Whole doc</button>
+                  <button class="btn btn-sm btn-secondary" id="studioScopePageBtn" title="Show only the page on screen">This page</button>
+                </div>
+              </div>
+
+              <div class="studio-toolbar-sep" aria-hidden="true"></div>
+
+              <div class="studio-toolbar-group" role="group" aria-label="Panes">
+                <button class="btn btn-sm btn-secondary active" id="studioTogglePdfBtn" title="Show or hide the scanned page" aria-pressed="true">
+                  <svg class="btn-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  <span>Scan</span>
+                </button>
+                <button class="btn btn-sm btn-secondary" id="studioCompareBtn" title="Open a second document beside this one" aria-pressed="false">
+                  <svg class="btn-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="7" height="16" rx="1"/><rect x="14" y="4" width="7" height="16" rx="1"/></svg>
+                  <span>Compare</span>
+                </button>
+                <button class="btn btn-sm btn-secondary active" id="studioAutoScrollBtn" title="Keep the scan in step with the transcript as you scroll" aria-pressed="true">
+                  <svg class="btn-glyph" viewBox="0 0 24 24" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                  <span>Sync scan</span>
+                </button>
+              </div>
+
+              <div class="studio-toolbar-group studio-diff-group" role="group" aria-label="Changes">
+                <button class="btn btn-sm btn-secondary active" id="studioLinkPagesBtn" title="Keep both documents on the same page number" aria-pressed="true" style="display: none;">
+                  <svg class="btn-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                  <span>Same page</span>
+                </button>
+                <button class="btn btn-sm btn-secondary" id="studioDiffBtn" title="Highlight what changed between the two documents" aria-pressed="false" style="display: none;">
+                  <svg class="btn-glyph" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="8" x2="12" y2="8"/><line x1="8" y1="4" x2="8" y2="12"/><line x1="12" y1="17" x2="20" y2="17"/></svg>
+                  <span>Changes</span>
+                </button>
+                <!--
+                  A named choice, not a chip. This read "vs MARKDOWN", which
+                  told you a word but not what the word did to your comparison.
+                -->
+                <label class="studio-diff-mode" id="studioDiffModeWrap" style="display: none;">
+                  <span class="studio-diff-mode-label">Comparing</span>
+                  <select id="studioDiffModeSelect" class="form-select form-select-sm" aria-label="What the comparison looks at">
+                    <option value="source">text and formatting</option>
+                    <option value="prose">text only</option>
+                  </select>
+                </label>
+                <span class="diff-summary" id="studioDiffSummary" style="display: none;"></span>
+                <button class="btn btn-sm btn-secondary btn-icon-label" id="studioDiffPrevBtn" title="Previous change (p)" aria-label="Previous change" aria-keyshortcuts="p" style="display: none;">
+                  <svg class="btn-glyph" viewBox="0 0 24 24" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>
+                </button>
+                <button class="btn btn-sm btn-secondary btn-icon-label" id="studioDiffNextBtn" title="Next change (n)" aria-label="Next change" aria-keyshortcuts="n" style="display: none;">
+                  <svg class="btn-glyph" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+              </div>
+
+              <div class="studio-toolbar-group studio-toolbar-actions" role="group" aria-label="Document actions">
+                <button class="btn btn-sm btn-secondary" id="studioSearchToggleBtn" title="Find in this document (Cmd+F)" aria-keyshortcuts="Meta+F Control+F">
+                  <svg class="btn-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <span>Find</span>
+                </button>
+                <button class="btn btn-sm btn-secondary" id="studioSaveBtn" title="Save edits to the .md file on disk" style="display: none;">
+                  <svg class="btn-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  <span>Save</span>
+                </button>
+                <button class="btn btn-sm btn-secondary btn-icon-label" id="studioCopyBtn" title="Copy the markdown to the clipboard" aria-label="Copy markdown">
+                  <svg class="btn-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </button>
+                <button class="btn btn-sm btn-primary btn-icon-label" id="studioDownloadBtn" title="Download the markdown file" aria-label="Download markdown">
+                  <svg class="btn-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Open documents -->
+          <div class="studio-tab-strip" id="studioTabStrip" role="tablist" aria-label="Open documents"></div>
+
+          <!-- Studio 3-Pane Body -->
+          <div class="studio-workspace-body">
+            <!-- Left: Page Navigator Jump List -->
+            <div class="studio-pane studio-outline-pane" id="studioOutlinePane">
+              <div class="studio-pane-header">
+                <span>Page Index (<span id="studioPageCount">0</span>)</span>
+              </div>
+              <div class="studio-page-list" id="studioPageList"></div>
+            </div>
+
+            <div class="studio-splitter" id="studioSplitterOutline" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Resize page index"></div>
+
+            <!-- Center: Markdown Transcript (Rendered or Raw Editor) -->
+            <div class="studio-pane studio-markdown-pane" id="studioMarkdownPane">
+              <!-- Search Toolbar -->
+              <div class="viewer-search-bar" id="studioSearchBar" role="search" aria-label="Studio document text search" style="display: none;">
+                <div class="viewer-search-input-group">
+                  <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <input
+                    type="search"
+                    id="studioSearchInput"
+                    class="form-input search-input"
+                    placeholder="Find in this document"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-label="Find in document"
+                    aria-describedby="studioSearchCount"
+                  />
+                  <button class="search-case-btn" id="studioSearchCaseBtn" title="Match Case" aria-label="Toggle case sensitivity" aria-pressed="false">Aa</button>
+                </div>
+                <!--
+                  Which document is being searched. Appears only while two are
+                  open — with one, there is nothing to choose between, and a
+                  disabled toggle is just clutter.
+                -->
+                <div class="btn-group search-pane-picker" id="studioSearchPanePicker" role="group" aria-label="Which document to search" style="display: none;">
+                  <button class="btn btn-xs btn-secondary active" id="studioSearchPaneABtn" data-pane="A" title="Search the document on the left">A</button>
+                  <button class="btn btn-xs btn-secondary" id="studioSearchPaneBBtn" data-pane="B" title="Search the document on the right">B</button>
+                </div>
+                <div class="viewer-search-controls">
+                  <span class="search-count" id="studioSearchCount" role="status" aria-live="polite">0/0</span>
+                  <button class="btn btn-icon btn-xs" id="studioSearchPrevBtn" title="Previous match (Shift+Enter)" aria-label="Previous match" disabled>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                  </button>
+                  <button class="btn btn-icon btn-xs" id="studioSearchNextBtn" title="Next match (Enter)" aria-label="Next match" disabled>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </button>
+                  <button class="btn btn-icon btn-xs close-search-btn" id="studioSearchCloseBtn" title="Close search (Esc)" aria-label="Close search">
+                    &times;
+                  </button>
+                </div>
+              </div>
+
+              <!-- Rendered Markdown View -->
+              <div class="markdown-preview prose" id="studioMarkdownContent"></div>
+
+              <!-- Raw Markdown View -->
+              <div class="raw-editor-wrapper" id="studioRawMarkdownWrapper" style="display: none; height: 100%;">
+                <textarea id="studioRawMarkdownTextarea" class="code-editor" spellcheck="false" placeholder="Raw markdown content..."></textarea>
+              </div>
+            </div>
+
+            <div class="studio-splitter" id="studioSplitterMain" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Resize transcript pane"></div>
+
+            <!-- Right: Scanned PDF Preview Canvas -->
+            <div class="studio-pane studio-pdf-pane" id="studioPdfPane">
+              <div class="pdf-controls-bar">
+                <button class="btn btn-xs btn-secondary" id="studioPdfPrevPageBtn">&larr; Prev</button>
+                <span class="text-xs" id="studioPdfPageIndicator">Page 1 of 1</span>
+                <button class="btn btn-xs btn-secondary" id="studioPdfNextPageBtn">Next &rarr;</button>
+                <div class="pdf-zoom-controls" role="group" aria-label="Zoom">
+                  <button class="btn btn-xs btn-secondary" data-zoom="out" title="Zoom out">&minus;</button>
+                  <button class="btn btn-xs btn-secondary" data-zoom="fit-width" title="Fit the page width">&harr;</button>
+                  <button class="btn btn-xs btn-secondary active" data-zoom="fit-page" title="Fit the whole page">&#9633;</button>
+                  <button class="btn btn-xs btn-secondary" data-zoom="in" title="Zoom in">+</button>
+                  <span class="pdf-zoom-level" id="studioPdfZoomLevel">Fit</span>
+                </div>
+              </div>
+              <div class="pdf-render-canvas-wrapper" id="studioPdfCanvasWrapper">
+                <img id="studioPdfPageImage" class="pdf-page-image" alt="PDF Page Preview">
+              </div>
+            </div>
+
+            <!-- Compare: second document, hidden until Compare is turned on -->
+            <div class="studio-pane studio-compare-pane" id="studioComparePane" style="display: none;"></div>
+          </div>
+        </div>
+      </div>

@@ -1,0 +1,128 @@
+      <!-- ========================================== -->
+      <!-- VIEW 4: TOKEN ECONOMICS & COST TRANSPARENCY-->
+      <!-- ========================================== -->
+      <div class="studio-view" id="viewEconomics" style="display: none;">
+        <div class="standalone-panel">
+          <div class="standalone-header">
+            <div>
+              <h2 class="section-hero-title">💰 Token Economics & Pricing Transparency</h2>
+              <p class="text-muted mt-1">Transparent rate cards and live cost calculator based on your exact workspace filings.</p>
+            </div>
+          </div>
+
+          <div class="economics-grid">
+            <!-- Rate Card -->
+            <div class="economics-card">
+              <div class="card-header-flex">
+                <h3 class="card-title">Official Google Gemini Rate Card</h3>
+                <div class="pricing-actions">
+                  <button class="btn btn-outline-night btn-sm" id="econSyncPricingBtn" title="Sync live rates from Google AI Docs">
+                    <span id="econSyncSpinner" class="sync-icon">🔄</span> Sync Latest Rates
+                  </button>
+                </div>
+              </div>
+              <p class="pricing-notice-text mt-1">
+                Rates per 1M tokens in USD. Reference: <a href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank" rel="noopener noreferrer">Google AI Pricing Documentation ↗</a> (check for current tier updates).
+              </p>
+              <table class="pricing-table mt-2">
+                <thead>
+                  <tr>
+                    <th>Model</th>
+                    <th>Standard Input</th>
+                    <th>Standard Output</th>
+                    <th>Overnight Batch (50% Off)</th>
+                  </tr>
+                </thead>
+                <tbody id="rateCardTableBody">
+                  <tr class="highlight-row">
+                    <td><strong>Gemini 3.1 Flash-Lite</strong> <span class="badge-tag default">Default</span></td>
+                    <td>$0.25 / M tokens</td>
+                    <td>$1.50 / M tokens</td>
+                    <td><strong class="text-night">$0.125 / $0.75</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 3.5 Flash-Lite</strong> <span class="badge-tag">Economy</span></td>
+                    <td>$0.30 / M tokens</td>
+                    <td>$2.50 / M tokens</td>
+                    <td><strong class="text-night">$0.15 / $1.25</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 3.7 Flash</strong> <span class="badge-tag frontier">Frontier</span></td>
+                    <td>$0.75 / M tokens</td>
+                    <td>$3.75 / M tokens</td>
+                    <td><strong class="text-night">$0.375 / $1.875</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 3.6 Flash</strong></td>
+                    <td>$0.75 / M tokens</td>
+                    <td>$3.75 / M tokens</td>
+                    <td><strong class="text-night">$0.375 / $1.875</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 3.5 Flash</strong></td>
+                    <td>$1.50 / M tokens</td>
+                    <td>$9.00 / M tokens</td>
+                    <td><strong class="text-night">$0.75 / $4.50</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 3 Flash Preview</strong></td>
+                    <td>$0.50 / M tokens</td>
+                    <td>$3.00 / M tokens</td>
+                    <td><strong class="text-night">$0.25 / $1.50</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 3.1 Pro Preview</strong> <span class="badge-tag pro">Pro</span></td>
+                    <td>$2.00 / M tokens</td>
+                    <td>$12.00 / M tokens</td>
+                    <td><strong class="text-night">$1.00 / $6.00</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 2.5 Pro</strong> <span class="badge-tag pro">Pro</span></td>
+                    <td>$1.25 / M tokens</td>
+                    <td>$10.00 / M tokens</td>
+                    <td><strong class="text-night">$0.625 / $5.00</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 2.5 Flash</strong></td>
+                    <td>$0.30 / M tokens</td>
+                    <td>$2.50 / M tokens</td>
+                    <td><strong class="text-night">$0.15 / $1.25</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Gemini 2.5 Flash-Lite</strong></td>
+                    <td>$0.10 / M tokens</td>
+                    <td>$0.40 / M tokens</td>
+                    <td><strong class="text-night">$0.05 / $0.20</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Workspace Cost Estimate Breakdown -->
+            <div class="economics-card">
+              <h3 class="card-title">Your Workspace Cost Breakdown</h3>
+              <div class="cost-stat-pills mt-3">
+                <div class="cost-stat-box">
+                  <span class="cost-box-label">Total Documents</span>
+                  <strong class="cost-box-num" id="econTotalDocs">0</strong>
+                </div>
+                <div class="cost-stat-box">
+                  <span class="cost-box-label">Total Pages</span>
+                  <strong class="cost-box-num" id="econTotalPages">0</strong>
+                </div>
+                <div class="cost-stat-box">
+                  <span class="cost-box-label">Standard Est. Cost</span>
+                  <strong class="cost-box-num text-success" id="econStandardCost">$0.00</strong>
+                </div>
+                <div class="cost-stat-box">
+                  <span class="cost-box-label">Overnight Batch Est.</span>
+                  <strong class="cost-box-num text-night" id="econBatchCost">$0.00</strong>
+                </div>
+              </div>
+              <div class="formula-box mt-3">
+                <strong>Calculation Method:</strong> 1 PDF page contains ~400 input prompt tokens + generates ~850 output markdown tokens (~1,250 tokens per page).
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>

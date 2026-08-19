@@ -1,0 +1,161 @@
+      <div class="studio-view" id="viewCombiner" style="display: none;">
+        <div class="combiner-studio-layout">
+          <!-- Left: Full-Height Document Selector & Sequence Manager -->
+          <div class="combiner-sidebar-studio">
+            <div class="combiner-studio-header">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 class="studio-pane-title">Document Sequence</h3>
+                <span id="studioCombinerSelectedCountBadge" class="tab-badge" style="font-size: 13px;">0 Selected</span>
+              </div>
+
+              <!-- Source Folder Selector -->
+              <div class="combiner-source-filter-box mt-2">
+                <label class="text-xs text-muted" for="studioCombinerSourceFolderSelect" style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                  <span>Source Folder / Entity:</span>
+                  <span id="studioCombinerSourceSummary" class="text-accent">377 converted</span>
+                </label>
+                <select id="studioCombinerSourceFolderSelect" class="form-select form-select-sm"></select>
+                <!--
+                  Off by default: a consolidation contains every document in the
+                  folder it was made from, so offering it beside those documents
+                  makes "Select Entity" include everything twice.
+                -->
+                <label class="checkbox-pill mt-2" title="Consolidations already contain the documents they were made from">
+                  <input type="checkbox" id="studioCombinerIncludeConsolidated">
+                  <span>Include previously consolidated files</span>
+                </label>
+              </div>
+
+              <!-- Instant Search in Combiner -->
+              <div class="search-input-wrapper mt-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="studioCombinerSearchInput" class="search-input" placeholder="Filter documents in sequence..." spellcheck="false">
+              </div>
+
+              <!-- Quick Selection & Sort Controls -->
+              <div class="combiner-controls-row mt-2">
+                <div class="combiner-quick-actions">
+                  <button class="btn btn-xs btn-secondary" id="studioCombinerSelectFolderBtn">Select Entity</button>
+                  <button class="btn btn-xs btn-secondary" id="studioCombinerSelectAllBtn">Select All</button>
+                  <button class="btn btn-xs btn-secondary" id="studioCombinerDeselectBtn">Clear</button>
+                </div>
+
+                <div class="combiner-sort-bar">
+                  <button class="btn btn-xs btn-secondary" id="studioCombinerSortChronoAscBtn" title="Sort chronologically by year ascending (Oldest to Newest)">📅 Year &uarr;</button>
+                  <button class="btn btn-xs btn-secondary" id="studioCombinerSortChronoDescBtn" title="Sort chronologically by year descending (Newest to Oldest)">📅 Year &darr;</button>
+                  <button class="btn btn-xs btn-secondary" id="studioCombinerSortAlphaBtn" title="Sort alphabetically A to Z">🔤 A-Z</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Notice Banner -->
+            <div class="combiner-folder-notice" id="studioCombinerFolderNotice" style="display: none;"></div>
+
+            <!-- Full-Height Scrollable File List -->
+            <div class="combiner-file-list" id="studioCombinerFileList">
+              <div class="text-muted text-center" style="padding: 40px;">Loading converted documents...</div>
+            </div>
+          </div>
+
+          <!-- Right: Live Consolidated Preview & Configuration -->
+          <div class="combiner-preview-panel">
+            <!-- Top Configuration Bar: Title, Filename, Destination, and Feature Toggles -->
+            <div class="combiner-config-header">
+              <div class="combiner-config-row">
+                <div class="form-group mb-0" style="flex: 2;">
+                  <label class="text-xs text-muted" for="studioCombinerMasterTitleInput">Master Document Title</label>
+                  <input type="text" id="studioCombinerMasterTitleInput" class="form-input form-input-sm" placeholder="Consolidated Document Title">
+                </div>
+                <div class="form-group mb-0" style="flex: 1.2;">
+                  <label class="text-xs text-muted" for="studioCombinerOutputFilenameInput">Output File Name</label>
+                  <input type="text" id="studioCombinerOutputFilenameInput" class="form-input form-input-sm" placeholder="Consolidated_Document.md">
+                </div>
+                <div class="form-group mb-0" style="flex: 1.2;">
+                  <label class="text-xs text-muted" for="studioCombinerTargetFolderSelect">Save Destination</label>
+                  <select id="studioCombinerTargetFolderSelect" class="form-select form-select-sm"></select>
+                </div>
+              </div>
+
+              <!-- Inline Toggle Pills -->
+              <div class="combiner-toggles-bar mt-2">
+                <label class="checkbox-pill">
+                  <input type="checkbox" id="studioCombinerIncludeToc" checked>
+                  <span>Interactive table of contents</span>
+                </label>
+                <label class="checkbox-pill">
+                  <input type="checkbox" id="studioCombinerIncludeSourceMeta" checked>
+                  <span>Source metadata banners</span>
+                </label>
+                <label class="checkbox-pill">
+                  <input type="checkbox" id="studioCombinerStripHeaders" checked>
+                  <span>Clean duplicate headers</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Preview Header & Stats Sub-Bar -->
+            <div class="combiner-preview-header">
+              <div class="tab-group" id="studioCombinerPreviewTabs">
+                <button class="tab-btn active" data-tab="rendered">Rendered Preview</button>
+                <button class="tab-btn" data-tab="raw">Raw Markdown</button>
+              </div>
+
+              <div class="combiner-stats-bar">
+                <span class="stat-pill"><strong id="studioCombinerStatDocs">0</strong> Docs</span>
+                <span class="stat-pill"><strong id="studioCombinerStatPages">0</strong> Pages</span>
+                <span class="stat-pill"><strong id="studioCombinerStatWords">0</strong> Words</span>
+                <span class="stat-pill"><strong id="studioCombinerStatChars">0</strong> Chars</span>
+              </div>
+            </div>
+
+            <!-- Live Preview Body Area -->
+            <div class="combiner-preview-body">
+              <div class="combiner-preview-notice" id="studioCombinerPreviewNotice" role="status" style="display: none;"></div>
+              <div class="combiner-view-panel active" id="studioCombinerTabRendered">
+                <div class="markdown-preview prose" id="studioCombinerRenderedContent">
+                  <div class="text-muted text-center" style="padding: 60px;">Select converted documents on the left to preview consolidated markdown.</div>
+                </div>
+              </div>
+
+              <div class="combiner-view-panel" id="studioCombinerTabRaw">
+                <div class="raw-editor-wrapper" style="height: 100%;">
+                  <textarea id="studioCombinerRawMarkdownTextarea" class="code-editor" spellcheck="false" placeholder="Consolidated markdown will appear here..."></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer Actions Bar -->
+            <div class="combiner-footer">
+              <div class="combiner-footer-info" id="studioCombinerSaveDestinationText">Destination: /Accounts/Consolidated_Document.md</div>
+              <div class="combiner-footer-actions">
+                <button class="btn btn-secondary btn-md" id="studioCombinerCopyBtn" title="Copy raw markdown to clipboard">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  Copy Markdown
+                </button>
+                <button class="btn btn-secondary btn-md" id="studioCombinerDownloadBtn" title="Download consolidated markdown file">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  Download .md
+                </button>
+                <button class="btn btn-primary btn-md" id="studioCombinerSaveBtn" title="Save consolidated markdown directly to disk">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                  </svg>
+                  Save to Workspace
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>

@@ -1,0 +1,186 @@
+      <!-- ========================================== -->
+      <!-- VIEW 1: WORKSPACE (DOCUMENTS & ENTITIES)  -->
+      <!-- ========================================== -->
+      <div class="studio-view active" id="viewWorkspace">
+        <div class="workspace-layout">
+          <!-- Left Sidebar: Corporate Entities / Folders -->
+          <aside class="sidebar entity-sidebar">
+            <div class="sidebar-top-header">
+              <div class="sidebar-title-row">
+                <span class="sidebar-heading">Entities & Folders</span>
+                <div class="header-actions-inline">
+                  <button class="btn-icon" id="newFolderBtn" title="Create new corporate entity folder">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                      <line x1="12" y1="11" x2="12" y2="17"></line>
+                      <line x1="9" y1="14" x2="15" y2="14"></line>
+                    </svg>
+                  </button>
+                  <button class="btn-icon" id="refreshBtn" title="Refresh files & folders">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M23 4v6h-6"></path>
+                      <path d="M1 20v-6h6"></path>
+                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="search-input-wrapper mt-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="folderSearchInput" class="search-input" placeholder="Filter entities..." spellcheck="false">
+              </div>
+            </div>
+
+            <!-- Full-Height Scrollable Entity List -->
+            <div class="entity-list-scroll">
+              <ul class="entity-list" id="folderList"></ul>
+            </div>
+
+            <!-- Sidebar Bottom Info Bar -->
+            <div class="sidebar-bottom-bar">
+              <div class="sidebar-stat-chip">
+                <span id="totalReportsCount">0</span> docs • <span id="convertedReportsCount">0</span> .md
+              </div>
+              <button class="btn-text-link" id="sidebarQuickUploadBtn">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                Upload to folder
+              </button>
+            </div>
+          </aside>
+
+          <!-- Right Content Panel: Document Data Table & Actions -->
+          <section class="content-panel">
+            <!-- Context Header -->
+            <div class="panel-header">
+              <div class="panel-title-area">
+                <h2 class="folder-main-title" id="activeFolderTitle">All Documents</h2>
+                <div class="folder-stats-summary" id="activeFolderSubtitle">
+                  Loading filings and workspace metrics...
+                </div>
+              </div>
+              <div class="panel-actions">
+                <button class="btn btn-secondary btn-md" id="combineFolderBtn" style="display: none;" title="Consolidate converted markdown files in this entity">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                  </svg>
+                  Combine Converted (<span id="folderConvertedCount">0</span>)
+                </button>
+                <button class="btn btn-accent btn-md" id="convertScopeBtn" title="Run OCR conversion on unconverted documents in active view">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                  </svg>
+                  Convert Folder (<span id="scopeDocCount">0</span>)
+                </button>
+                <button class="btn btn-outline-night btn-md" id="submitOvernightBatchBtn" title="Submit folder as an asynchronous Gemini Batch Job with 50% discount">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                  </svg>
+                  Overnight (50% Off)
+                </button>
+              </div>
+            </div>
+
+            <!-- Table Controls: Status Filter Tabs, Search & Sort -->
+            <div class="table-toolbar">
+              <div class="filter-tabs-group" role="tablist">
+                <button class="filter-tab-btn active" data-filter="all" id="filterTabAll">
+                  All <span class="filter-count" id="countFilterAll">0</span>
+                </button>
+                <button class="filter-tab-btn" data-filter="ready" id="filterTabReady">
+                  Needs OCR <span class="filter-count ready-pill" id="countFilterReady">0</span>
+                </button>
+                <button class="filter-tab-btn" data-filter="converted" id="filterTabConverted">
+                  Converted <span class="filter-count converted-pill" id="countFilterConverted">0</span>
+                </button>
+                <button class="filter-tab-btn" data-filter="batch" id="filterTabBatch">
+                  In Batch <span class="filter-count batch-pill" id="countFilterBatch">0</span>
+                </button>
+              </div>
+
+              <div class="toolbar-controls-right">
+                <div class="search-input-wrapper table-search">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <input type="text" id="documentSearchInput" class="search-input" placeholder="Search filings in view..." spellcheck="false">
+                </div>
+
+                <select id="documentSortSelect" class="form-select form-select-sm sort-select">
+                  <option value="year_desc">Year (Newest &rarr; Oldest)</option>
+                  <option value="year_asc">Year (Oldest &rarr; Newest)</option>
+                  <option value="name_asc">Filing Name (A &rarr; Z)</option>
+                  <option value="pages_desc">Pages (High &rarr; Low)</option>
+                  <option value="size_desc">File Size (Large &rarr; Small)</option>
+                </select>
+
+                <div class="selection-action-btns">
+                  <button class="btn btn-sm btn-secondary" id="selectAllBtn">Select All</button>
+                  <button class="btn btn-sm btn-secondary" id="deselectAllBtn">Deselect</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Documents Data Table -->
+            <div class="data-table-container">
+              <table class="documents-table" id="documentsTable">
+                <thead>
+                  <tr>
+                    <th style="width: 40px; text-align: center;">
+                      <input type="checkbox" id="masterTableCheckbox" class="doc-chk" title="Toggle all in current filter">
+                    </th>
+                    <th class="doc-name-col">Document / Filing Name</th>
+                    <th style="width: 110px;">Period / Year</th>
+                    <th class="doc-size-col" style="width: 130px;">Pages &amp; Size</th>
+                    <th style="width: 140px;">Status</th>
+                    <th style="width: 140px; text-align: right;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="documentsTableBody">
+                  <tr>
+                    <td colspan="6" class="text-center" style="padding: 60px;">
+                      <div class="spinner-lg"></div>
+                      <p class="text-muted mt-2">Scanning your documents folder&hellip;</p>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Floating Multi-Selection Action Dock -->
+            <div class="floating-selection-bar" id="floatingSelectionBar" style="display: none;">
+              <div class="selection-info">
+                <span class="selection-badge" id="floatingSelectedCount">0</span>
+                <span class="selection-text">Filings Selected</span>
+              </div>
+              <div class="selection-actions">
+                <button class="btn btn-sm btn-primary" id="convertSelectedBtn">
+                  Convert Selected
+                </button>
+                <button class="btn btn-sm btn-outline-night" id="floatingBatchBtn" title="Submit selected documents as an overnight batch job (50% discount)">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                  </svg>
+                  Overnight (50% Off)
+                </button>
+                <button class="btn btn-sm btn-secondary" id="combineSelectedBtn" style="display: none;" title="Consolidate selected converted markdown files">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                  </svg>
+                  Combine (<span id="combineSelectedCount">0</span>)
+                </button>
+                <button class="btn-clear-selection" id="floatingClearSelectionBtn" title="Clear selection">
+                  &times;
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>

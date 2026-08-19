@@ -1,0 +1,126 @@
+  <!-- ========================================== -->
+  <!-- MODAL: SETTINGS & CONFIGURATION            -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="settingsModal" style="display: none;">
+    <div class="modal-dialog modal-md">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <h3>Settings & OCR Configuration</h3>
+        </div>
+        <button class="btn-close" id="closeSettingsBtn">&times;</button>
+      </div>
+      <div class="modal-body settings-body">
+        <div class="form-group mb-3">
+          <div class="label-with-action">
+            <label for="modelSelect">Gemini Vision Model</label>
+            <button type="button" class="btn-text-action" id="settingsSyncPricingBtn" title="Fetch latest model rates from Google Docs">
+              <span id="settingsSyncSpinner">🔄</span> Sync Rates
+            </button>
+          </div>
+          <select id="modelSelect" class="form-select">
+            <optgroup label="Gemini 3.x Models (Latest Generation)">
+              <option value="gemini-3.1-flash-lite" selected>Gemini 3.1 Flash-Lite (Default — $0.25 in / $1.50 out · Ultra Low Cost & High Speed)</option>
+              <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite ($0.30 in / $2.50 out · Cost-Efficient GA)</option>
+              <option value="gemini-3.7-flash">Gemini 3.7 Flash ($0.75 in / $3.75 out · Flagship Hybrid Reasoning & Multimodal)</option>
+              <option value="gemini-3.6-flash">Gemini 3.6 Flash ($0.75 in / $3.75 out · High Speed Frontier Intelligence)</option>
+              <option value="gemini-3.5-flash">Gemini 3.5 Flash ($1.50 in / $9.00 out · Balanced Speed & Intelligence)</option>
+              <option value="gemini-3-flash-preview">Gemini 3 Flash Preview ($0.50 in / $3.00 out · Preview Flash)</option>
+              <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview ($2.00 in / $12.00 out · Frontier Multimodal Understanding)</option>
+            </optgroup>
+            <optgroup label="Gemini 2.5 Models">
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro ($1.25 in / $10.00 out · Complex Layouts & Deep Reasoning)</option>
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash ($0.30 in / $2.50 out · Hybrid Reasoning)</option>
+              <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite ($0.10 in / $0.40 out · At-Scale Scaling)</option>
+            </optgroup>
+          </select>
+
+          <!-- Dynamic Live Model Specification Detail Card -->
+          <div class="model-spec-card mt-2" id="modelSpecsCard">
+            <div class="model-spec-header">
+              <div class="model-spec-title-group">
+                <strong id="specModelName">Gemini 3.1 Flash-Lite</strong>
+                <span class="model-badge" id="specModelTier">Default / Economy</span>
+              </div>
+              <span class="model-context-badge" id="specModelContext">Context: 1M tokens</span>
+            </div>
+            <p class="model-spec-desc" id="specModelDesc">Our most cost-efficient model, optimized for high-volume agentic tasks, translation, and simple data processing.</p>
+            <div class="model-spec-grid">
+              <div class="spec-stat">
+                <span class="spec-stat-label">Standard Input</span>
+                <strong class="spec-stat-val" id="specStdInput">$0.25 / 1M</strong>
+              </div>
+              <div class="spec-stat">
+                <span class="spec-stat-label">Standard Output</span>
+                <strong class="spec-stat-val" id="specStdOutput">$1.50 / 1M</strong>
+              </div>
+              <div class="spec-stat">
+                <span class="spec-stat-label">Overnight Batch</span>
+                <strong class="spec-stat-val highlight" id="specBatchRate">$0.125 / $0.75 (50% Off)</strong>
+              </div>
+              <div class="spec-stat">
+                <span class="spec-stat-label">Context Cache</span>
+                <strong class="spec-stat-val" id="specCacheRate">$0.025 / 1M</strong>
+              </div>
+            </div>
+            <div class="model-spec-footer">
+              <span class="spec-rec-label">💡 Best For:</span>
+              <span class="spec-rec-text" id="specModelRec">Default / Recommended — Ultra Low Cost & High Speed OCR</span>
+            </div>
+          </div>
+
+          <div class="pricing-doc-link-container mt-2">
+            <span class="pricing-doc-link-text">
+              Official rates from Google: <a href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank" rel="noopener noreferrer">ai.google.dev/pricing ↗</a> (check for the latest tier info)
+            </span>
+          </div>
+        </div>
+
+        <div class="form-group mb-3">
+          <label for="concurrencySelect">Parallel Workers (Concurrency)</label>
+          <select id="concurrencySelect" class="form-select">
+            <option value="1">1 Worker (Safe Rate-Limit)</option>
+            <option value="3">3 Workers</option>
+            <option value="5" selected>5 Workers (Default)</option>
+            <option value="8">8 Workers (High Speed)</option>
+          </select>
+        </div>
+
+        <div class="form-group mb-3">
+          <label>OCR Prompt Presets</label>
+          <div class="preset-pill-group">
+            <button class="preset-pill active" data-preset="financial">Financial & Filings</button>
+            <button class="preset-pill" data-preset="standard">Standard Document</button>
+            <button class="preset-pill" data-preset="academic">Academic & Technical</button>
+            <button class="preset-pill" data-preset="legal">Legal & Contracts</button>
+          </div>
+          <textarea id="systemPromptTextarea" class="form-textarea mt-2" rows="4"></textarea>
+        </div>
+
+        <div class="form-group mb-3">
+          <label for="workingDirInput">Working Documents Directory</label>
+          <div class="input-with-button">
+            <input type="text" id="workingDirInput" class="form-input" placeholder="/path/to/Accounts or documents" spellcheck="false">
+            <button type="button" class="btn btn-secondary" id="changeWorkingDirBtn">Switch Directory</button>
+          </div>
+          <span class="text-xs text-muted mt-1" style="display: block;">
+            The active root folder scanned for entities, PDFs, and transcribed Markdown output.
+          </span>
+        </div>
+
+        <div class="form-group mb-2">
+          <label class="checkbox-row">
+            <input type="checkbox" id="forceReprocessCheckbox">
+            <span>Force Reprocess (Bypass Cached OCR Pages)</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="saveSettingsBtn">Save Settings</button>
+      </div>
+    </div>
+  </div>
+

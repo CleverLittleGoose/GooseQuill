@@ -1,0 +1,24 @@
+  <!-- ========================================== -->
+  <!-- MODAL: DIAGNOSTICS & LOGS                  -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="logsModal" style="display: none;">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="4 17 10 11 4 5"></polyline>
+            <line x1="12" y1="19" x2="20" y2="19"></line>
+          </svg>
+          <h3>Diagnostics & Execution Logs</h3>
+        </div>
+        <div class="modal-header-actions">
+          <button class="btn btn-sm btn-secondary" id="modalTestApiBtn">Test API Connection</button>
+          <button class="btn btn-sm btn-secondary" id="clearLogsBtn">Clear</button>
+          <button class="btn-close" id="closeLogsBtn">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="console-box" id="liveLogsConsole"></div>
+      </div>
+    </div>
+  </div>
