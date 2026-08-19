@@ -11,6 +11,10 @@ import { studio } from "./state.js";
 import * as dom from "./dom.js";
 import { goToPage } from "./navigation.js";
 
+// Above this proportion of changed pages, the comparison is almost certainly
+// between two documents that have nothing to do with each other.
+const UNRELATED_THRESHOLD = 0.95;
+
 // Page pairs are diffed on demand and kept, so scrolling back over a page does
 // not pay for the comparison twice. Keyed by page *and* mode, because the two
 // modes give different answers for the same pair.
@@ -73,11 +77,23 @@ export function setDiffEnabled(enabled) {
 
   const summary = dom.diffSummary();
   if (summary) {
-    const parts = [`${studio.diffChangedPages.length}/${comparison.sharedPages.length} changed`];
+    const changed = studio.diffChangedPages.length;
+    const shared = comparison.sharedPages.length;
+
+    const parts = [`${changed}/${shared} changed`];
     if (comparison.onlyInA.length) parts.push(`${comparison.onlyInA.length} only A`);
     if (comparison.onlyInB.length) parts.push(`${comparison.onlyInB.length} only B`);
+
+    // Nearly everything differing is what two unrelated filings look like. The
+    // number is accurate and useless on its own — "214/214 changed" reads as a
+    // finding when it actually means the comparison had nothing to work with.
+    const wholesale = shared > 0 && changed / shared >= UNRELATED_THRESHOLD;
+
     summary.textContent = parts.join(" · ");
-    summary.title = `${studio.diffChangedPages.length} of ${comparison.sharedPages.length} shared pages differ`;
+    summary.classList.toggle("diff-summary-wholesale", wholesale);
+    summary.title = wholesale
+      ? `Almost every shared page differs (${changed} of ${shared}). Comparing two unrelated documents looks exactly like this — diff is most useful across years of the same entity.`
+      : `${changed} of ${shared} shared pages differ`;
   }
 
   // Both panes render the same page pair, each showing its own side.
