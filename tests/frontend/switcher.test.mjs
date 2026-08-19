@@ -8,7 +8,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { rankDocuments } from "../../web/js/studio/switcher.js";
+import { rankDocuments, distinguishingName } from "../../web/js/studio/switcher.js";
 
 const docs = [
   { folder: "Northwind Properties PLC", name: "Northwind Properties PLC - Annual Report 2025.pdf", path: "a" },
@@ -66,4 +66,57 @@ test("results are capped so the list stays navigable", () => {
 
 test("documents with no entity or name do not throw", () => {
   assert.doesNotThrow(() => rankDocuments([{ path: "x" }], "anything"));
+});
+
+
+/* ------------------------------------------------------ what a row displays */
+
+const named = (folder, name) => ({ folder, name });
+
+test("the entity is dropped from the name when it only repeats the folder", () => {
+  // Twenty years of one entity produced twenty identical truncated rows.
+  assert.equal(
+    distinguishingName(named("Kingsmere Resort Operations Limited",
+                             "Kingsmere Resort Operations Limited - Annual Report 2019.pdf")),
+    "Annual Report 2019"
+  );
+});
+
+test("the separator between entity and title goes with it", () => {
+  const folder = "Acme Holdings Limited";
+  for (const sep of ["-", "–", "—", "_", ":", "."]) {
+    assert.equal(distinguishingName(named(folder, `${folder} ${sep} Annual Report 2020.pdf`)), "Annual Report 2020");
+  }
+});
+
+test("matching ignores case and extra spacing", () => {
+  assert.equal(
+    distinguishingName(named("Acme Holdings Limited", "ACME  Holdings   Limited - Annual Report 2021.pdf")),
+    "Annual Report 2021"
+  );
+});
+
+test("a name that does not start with the entity is left whole", () => {
+  assert.equal(
+    distinguishingName(named("Acme Holdings Limited", "Mortgage or Charge 3.pdf")),
+    "Mortgage or Charge 3"
+  );
+});
+
+test("a name that is only the entity keeps it, rather than becoming blank", () => {
+  assert.equal(
+    distinguishingName(named("Acme Holdings Limited", "Acme Holdings Limited.pdf")),
+    "Acme Holdings Limited"
+  );
+});
+
+test("the .md extension is dropped too, for consolidated documents", () => {
+  assert.equal(
+    distinguishingName(named("Acme Holdings Limited", "Acme Holdings Limited - Consolidated 2008-2025.md")),
+    "Consolidated 2008-2025"
+  );
+});
+
+test("a document with no folder keeps its full name", () => {
+  assert.equal(distinguishingName({ name: "Some Filing 2020.pdf" }), "Some Filing 2020");
 });

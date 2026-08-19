@@ -129,6 +129,36 @@ function refresh(query) {
   draw();
 }
 
+/**
+ * The part of a filename that tells one document from another.
+ *
+ * Filings are named "<Entity> - Annual Report 2019.pdf", and an entity with
+ * twenty years of accounts produced twenty rows reading
+ * "Kingsmere Resort Operations Limited - Annual Report…" — identical up to
+ * the truncation, with the year, the only thing that differed, cut off. The
+ * entity is already in the column beside it.
+ *
+ * Only the leading entity name is dropped, and only when it really is the
+ * folder repeating itself, so a document named something else keeps its name.
+ */
+export function distinguishingName(doc) {
+  const full = (doc.name || "").replace(/\.(pdf|md)$/i, "");
+  const folder = (doc.folder || "").trim();
+  if (!folder) return full;
+
+  // Matched rather than measured: comparing normalised text but slicing by the
+  // folder's own length gets it wrong the moment the filename spaces the entity
+  // differently from the folder does, and leaves a fragment of the entity
+  // behind. This lets whitespace differ and takes the separator with it.
+  const flexible = folder
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\s+/g, "\\s+");
+  const prefix = new RegExp(`^${flexible}\\s*[-–—_:.]*\\s*`, "i");
+
+  const remainder = full.replace(prefix, "").trim();
+  return remainder && remainder !== full ? remainder : full;
+}
+
 function draw() {
   list.innerHTML = "";
 
@@ -151,13 +181,22 @@ function draw() {
 
     const name = document.createElement("span");
     name.className = "doc-switcher-name";
-    name.textContent = doc.name.replace(/\.pdf$/i, "");
+    name.textContent = distinguishingName(doc);
+    name.title = doc.name;
 
     const folder = document.createElement("span");
     folder.className = "doc-switcher-folder";
     folder.textContent = doc.folder || "";
 
-    item.append(name, folder);
+    if (doc.is_consolidated) {
+      // Worth marking: it reads like a filing but it is many of them at once.
+      const badge = document.createElement("span");
+      badge.className = "doc-switcher-badge";
+      badge.textContent = "consolidated";
+      item.append(name, badge, folder);
+    } else {
+      item.append(name, folder);
+    }
     item.addEventListener("click", () => choose(index));
     list.appendChild(item);
   });
