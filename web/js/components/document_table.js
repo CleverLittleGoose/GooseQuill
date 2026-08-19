@@ -330,7 +330,7 @@ export function renderDocuments() {
     } else if (doc.batch_status === "JOB_STATE_RUNNING") {
       statusBadge = `<span class="status-badge batch-running"><span class="spinner" style="width: 10px; height: 10px; border-width: 1.5px;"></span>In Batch</span>`;
     } else if (doc.batch_status === "JOB_STATE_PENDING") {
-      statusBadge = `<span class="status-badge batch-pending">⏳ Queued</span>`;
+      statusBadge = `<span class="status-badge batch-pending">Queued</span>`;
     }
 
     const sizeKb = (doc.file_size / 1024).toFixed(0);

@@ -869,6 +869,9 @@ input[type="checkbox"]:focus-visible {
   border-radius: var(--radius-xs);
   font-size: 13px;
   font-weight: 600;
+  /* Without this the tick wrapped onto its own line above the word once the
+     column tightened, which read as a stray mark rather than part of a badge. */
+  white-space: nowrap;
 }
 
 .status-badge.converted {
@@ -2266,7 +2269,11 @@ input[type="checkbox"]:focus-visible {
 
 .studio-sub-header {
   display: flex;
-  align-items: center;
+  /* The left block is two lines (picker, then the page/size/entity line) and
+     the toolbar is one. Centred, the toolbar floated against nothing in
+     particular; aligned to the top it sits on the same line as the picker,
+     which is the thing it acts on. */
+  align-items: flex-start;
   justify-content: space-between;
   padding: 10px 18px;
   background: var(--bg-surface);
@@ -2307,8 +2314,13 @@ input[type="checkbox"]:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
+  /* Rows of controls, not a ragged reflow: when the toolbar has to wrap, each
+     group stays whole and the rows line up on the right-hand edge. */
   flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 8px;
   flex: 1;
+  min-width: 0;
 }
 
 /* --------------------------------------------------------------------------
@@ -2324,6 +2336,9 @@ input[type="checkbox"]:focus-visible {
   display: flex;
   align-items: center;
   gap: 6px;
+  /* A group is a unit; breaking one across two rows loses the grouping that is
+     the entire point of it. */
+  flex-wrap: nowrap;
 }
 
 .studio-toolbar-sep {
@@ -2358,7 +2373,13 @@ input[type="checkbox"]:focus-visible {
  * regardless of the theme, they ignore stroke weight, and they sit on the text
  * baseline rather than optically centred against a label.
  */
-.btn-icon {
+/*
+ * Named .btn-glyph, not .btn-icon: .btn-icon was already the class for an icon
+ * *button*, and it carries `padding: 8px`. Applied to a 15px SVG under
+ * border-box sizing that leaves a negative content area, so every icon
+ * collapsed to nothing and the buttons rendered as empty rounded rectangles.
+ */
+.btn-glyph {
   width: 15px;
   height: 15px;
   flex-shrink: 0;
@@ -2369,7 +2390,7 @@ input[type="checkbox"]:focus-visible {
   stroke-linejoin: round;
 }
 
-.btn-sm .btn-icon {
+.btn-sm .btn-glyph {
   width: 14px;
   height: 14px;
 }
@@ -3488,4 +3509,162 @@ body.is-resizing-panes .studio-pane {
   min-width: 26px;
   padding: 3px 8px;
   font-weight: 600;
+}
+
+
+/* ==========================================================================
+   STUDIO SUB-HEADER WIDTH
+
+   The document picker sized itself to its longest option, taking 460px of a
+   1252px bar to show a filename that is also in the tab strip, the browser
+   title and the picker's own tooltip. The toolbar was wrapping to four rows to
+   pay for it.
+   ========================================================================== */
+.studio-doc-picker .compare-doc-select {
+  max-width: 280px;
+}
+
+.studio-doc-meta {
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+/*
+ * The change controls are contextual — they exist only while two documents are
+ * open — so when the bar runs out of room they take a row of their own rather
+ * than shuffling the permanent controls around every time Compare is toggled.
+ */
+.studio-diff-group {
+  margin-left: auto;
+}
+
+.diff-summary {
+  white-space: nowrap;
+}
+
+/*
+ * "214/214 changed" is accurate and useless: it is what comparing two unrelated
+ * filings looks like. Marked so it reads as a caveat rather than a result.
+ */
+.diff-summary-wholesale {
+  color: var(--accent-amber);
+}
+
+.diff-summary-wholesale::after {
+  content: " ⚠";
+}
+
+/* ==========================================================================
+   KEYBOARD SHORTCUTS HELP (?)
+
+   Every shortcut in the app was undiscoverable: nothing named them, and there
+   is no menu bar to hide them in.
+   ========================================================================== */
+.shortcuts-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 420;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(3, 6, 12, 0.72);
+  backdrop-filter: blur(3px);
+}
+
+.shortcuts-panel {
+  width: min(560px, 100%);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-dock);
+  overflow: hidden;
+}
+
+.shortcuts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.shortcuts-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.shortcuts-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 20px 16px;
+}
+
+.shortcuts-group {
+  margin-top: 16px;
+}
+
+.shortcuts-group h3 {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.shortcuts-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.shortcuts-row:last-child {
+  border-bottom: none;
+}
+
+.shortcuts-what {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.shortcuts-keys {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.shortcuts-or {
+  margin: 0 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.shortcuts-footer {
+  padding: 11px 20px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-app);
+}
+
+.shortcuts-panel kbd,
+.shortcuts-footer kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  text-align: center;
+  color: var(--text-secondary);
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);
 }
