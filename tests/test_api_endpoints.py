@@ -10,6 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from fixtures import SAMPLE_MARKDOWN
 from starlette.testclient import TestClient
+import app as app_module
 from app import app, PRICING
 
 class TestApiEndpoints(unittest.TestCase):
@@ -113,18 +114,105 @@ class TestApiEndpoints(unittest.TestCase):
         self.assertEqual(res.status_code, 204)
 
     def test_set_root_folder_endpoint(self):
-        """Test /api/set_root_folder switches documents directory with valid folder."""
-        import tempfile
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            res = self.client.post("/api/set_root_folder", json={"root_path": tmp_dir})
-            self.assertEqual(res.status_code, 200)
-            data = res.json()
-            self.assertEqual(data["status"], "success")
-            self.assertEqual(data["root_directory"], str(Path(tmp_dir).resolve()))
+        """Test /api/set_root_folder switches documents directory with valid folder.
 
-        # Invalid path should return 400
-        res_bad = self.client.post("/api/set_root_folder", json={"root_path": "/nonexistent/path/12345"})
-        self.assertEqual(res_bad.status_code, 400)
+        The root is module-level state on the app, so this puts it back. Left
+        pointing at a deleted temporary directory it made every later test that
+        touches a real path fail with 403 — the failure looked like a broken
+        path guard rather than a test that had not tidied up after itself.
+        """
+        import tempfile
+        original_root = app_module.BASE_ACCOUNTS_DIR
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                res = self.client.post("/api/set_root_folder", json={"root_path": tmp_dir})
+                self.assertEqual(res.status_code, 200)
+                data = res.json()
+                self.assertEqual(data["status"], "success")
+                self.assertEqual(data["root_directory"], str(Path(tmp_dir).resolve()))
+
+            # Invalid path should return 400
+            res_bad = self.client.post("/api/set_root_folder", json={"root_path": "/nonexistent/path/12345"})
+            self.assertEqual(res_bad.status_code, 400)
+        finally:
+            app_module.BASE_ACCOUNTS_DIR = original_root
+
+
+class TestDownloadMarkdown(unittest.TestCase):
+    """The download route hands a file straight out of the workspace.
+
+    That makes its two guards the interesting part: it must not serve anything
+    outside the documents folder, and it must not serve anything that is not a
+    Markdown file.
+    """
+
+    def setUp(self):
+        self.client = TestClient(app)
+
+    def test_refuses_a_path_outside_the_workspace(self):
+        res = self.client.get("/api/download_markdown", params={"path": "/etc/passwd"})
+        self.assertEqual(res.status_code, 403)
+
+    def test_refuses_traversal_out_of_the_workspace(self):
+        escape = str(app_module.BASE_ACCOUNTS_DIR / ".." / ".." / "etc" / "passwd")
+        res = self.client.get("/api/download_markdown", params={"path": escape})
+        self.assertEqual(res.status_code, 403)
+
+    def test_refuses_a_non_markdown_file(self):
+        target = app_module.BASE_ACCOUNTS_DIR / "download_guard_test.txt"
+        target.write_text("not markdown", encoding="utf-8")
+        try:
+            res = self.client.get("/api/download_markdown", params={"path": str(target)})
+            self.assertEqual(res.status_code, 400)
+        finally:
+            target.unlink(missing_ok=True)
+
+    def test_missing_file_is_a_404(self):
+        res = self.client.get(
+            "/api/download_markdown",
+            params={"path": str(app_module.BASE_ACCOUNTS_DIR / "definitely_not_here.md")}
+        )
+        self.assertEqual(res.status_code, 404)
+
+    def test_serves_a_markdown_file_as_a_download(self):
+        target = app_module.BASE_ACCOUNTS_DIR / "download_guard_test.md"
+        target.write_text("# Hello\n\nBody.\n", encoding="utf-8")
+        try:
+            res = self.client.get("/api/download_markdown", params={"path": str(target)})
+            self.assertEqual(res.status_code, 200)
+            self.assertIn("text/markdown", res.headers.get("content-type", ""))
+            self.assertIn("attachment", res.headers.get("content-disposition", ""))
+            self.assertIn("# Hello", res.text)
+        finally:
+            target.unlink(missing_ok=True)
+
+
+class TestComposedIndexPage(unittest.TestCase):
+    """index.html is assembled from its parts at request time.
+
+    A missing or renamed partial would otherwise fail quietly, leaving a comment
+    where a whole view should be.
+    """
+
+    def setUp(self):
+        self.client = TestClient(app)
+
+    def test_every_view_and_dialog_is_present(self):
+        res = self.client.get("/")
+        self.assertEqual(res.status_code, 200)
+        html = res.text
+
+        for element_id in (
+            "viewWorkspace", "viewStudio", "viewSearch",
+            "viewCombiner", "viewBatches", "viewEconomics",
+            "uploadModal", "settingsModal", "logsModal", "newFolderModal",
+        ):
+            self.assertIn(f'id="{element_id}"', html, f"{element_id} missing from the composed page")
+
+    def test_no_include_is_left_unresolved(self):
+        html = self.client.get("/").text
+        self.assertNotIn("#include", html, "an include marker survived composition")
+        self.assertNotIn("missing include", html, "an include named a file that is not there")
 
 if __name__ == "__main__":
     unittest.main()
