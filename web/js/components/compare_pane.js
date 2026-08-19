@@ -17,6 +17,7 @@
 
 import { TranscriptView } from "../services/transcript_view.js";
 import { populateDocumentSelect, findDocumentByPath, resolvePdfPath } from "../services/document_catalog.js";
+import { parsePages } from "../services/page_splitter.js";
 
 export class ComparePane {
   /**
@@ -206,46 +207,4 @@ export class ComparePane {
     this.transcript = null;
     this.container.innerHTML = "";
   }
-}
-
-/**
- * Split an assembled document into page-indexed markdown.
- * Mirrors the viewer's own splitter, including the leading document header.
- */
-function parsePages(fullMarkdown) {
-  const pages = {};
-  if (!fullMarkdown) return pages;
-
-  const pattern = /(?:<!--\s*Page\s+(\d+)\s*-->|(?:\n|^)##\s+Page\s+(\d+))/gi;
-  const splits = [];
-  let match;
-
-  while ((match = pattern.exec(fullMarkdown)) !== null) {
-    splits.push({ pageNum: parseInt(match[1] || match[2], 10), start: match.index });
-  }
-
-  if (splits.length === 0) {
-    pages[1] = fullMarkdown.trim();
-    return pages;
-  }
-
-  // The assembler writes both "<!-- Page N -->" and "## Page N", and the
-  // pattern matches each of them. Left as two splits, page N would be cut in
-  // half and the half that survived would lose its comment marker — which is
-  // what the fence unwrapper keys on. Keep only the first split per page.
-  const deduped = splits.filter((split, i) => i === 0 || split.pageNum !== splits[i - 1].pageNum);
-  splits.length = 0;
-  splits.push(...deduped);
-
-  const preamble = fullMarkdown.slice(0, splits[0].start).trim();
-  if (preamble) pages.preamble = preamble;
-
-  for (let i = 0; i < splits.length; i++) {
-    const nextStart = i + 1 < splits.length ? splits[i + 1].start : fullMarkdown.length;
-    let content = fullMarkdown.substring(splits[i].start, nextStart).trim();
-    if (content.endsWith("---")) content = content.slice(0, -3).trim();
-    pages[splits[i].pageNum] = content;
-  }
-
-  return pages;
 }
