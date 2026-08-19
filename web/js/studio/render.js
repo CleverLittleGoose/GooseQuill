@@ -64,7 +64,8 @@ export function updateDisplay() {
   ensureTranscript();
   if (studio.transcript) {
     studio.transcript.setDocument(studio.pagesMap, {
-      restrictToPage: studio.scope === "page" ? appState.currentPdfPage : null
+      restrictToPage: studio.scope === "page" ? appState.currentPdfPage : null,
+      pageLabels: studio.pageLabels
     });
   }
 
@@ -74,7 +75,13 @@ export function updateDisplay() {
 /** Rebuild the rendered transcript from the current page map, scope intact. */
 export function rerenderTranscript(options = {}) {
   ensureTranscript();
-  if (studio.transcript) studio.transcript.setDocument(studio.pagesMap, { restrictToPage: null, ...options });
+  if (studio.transcript) {
+    studio.transcript.setDocument(studio.pagesMap, {
+      restrictToPage: null,
+      pageLabels: studio.pageLabels,
+      ...options
+    });
+  }
 }
 
 /**

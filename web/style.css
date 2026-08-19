@@ -3621,3 +3621,50 @@ body.is-resizing-panes .studio-pane {
   color: var(--text-muted);
   box-shadow: none;
 }
+
+/*
+ * The name takes what it needs and the entity gives way.
+ *
+ * Both were truncating at once, so twenty years of one entity's accounts
+ * produced twenty identical rows: the entity repeated in full, and the year —
+ * the only thing that differed — cut off the end of the name.
+ */
+.doc-switcher-folder {
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * The page index for a document with no scan.
+ *
+ * A consolidation has no page images, so the thumbnail frames would be a
+ * column of empty grey boxes pretending to be an index. The labels alone say
+ * more, and the pane can be much narrower for them.
+ */
+.studio-page-list.is-textual .studio-page-item {
+  padding: 7px 10px;
+}
+
+.studio-page-list.is-textual .studio-page-item-label {
+  font-size: 13px;
+}
+
+/* Marks a switcher row as combiner output rather than a filing. */
+.doc-switcher-badge {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--accent-night);
+  background: var(--accent-night-glow);
+  border-radius: var(--radius-pill);
+}
+
+.doc-switcher-item.active .doc-switcher-badge {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.22);
+}

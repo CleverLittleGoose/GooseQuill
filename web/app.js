@@ -17,6 +17,37 @@ import { initSettingsModal } from "./js/components/settings_modal.js";
 import { initLogsModal } from "./js/components/logs_modal.js";
 import { initNewFolderModal } from "./js/components/new_folder_modal.js";
 
+/**
+ * Load the consolidated documents so the Studio can open them.
+ *
+ * They are deliberately absent from the Workspace table, which lists filings
+ * and their conversion state — a consolidation is neither. But nothing else
+ * listed them either, so once one was built there was no way back to it short
+ * of opening the file by hand.
+ */
+async function fetchConsolidatedDocuments() {
+  try {
+    const res = await fetch("/api/converted_markdowns");
+    const data = await res.json();
+    appState.consolidatedDocuments = (data.files || [])
+      .filter((file) => file.is_consolidated)
+      .map((file) => ({
+        name: file.name,
+        stem: file.stem,
+        path: file.path,
+        folder: file.folder,
+        file_size: file.size,
+        is_converted: true,
+        is_consolidated: true,
+        // Page count is not known until the file is read; the Studio fills it in.
+        total_pages: null
+      }));
+  } catch (e) {
+    console.error("Could not load consolidated documents:", e);
+    appState.consolidatedDocuments = [];
+  }
+}
+
 export async function fetchDocuments() {
   try {
     const res = await fetch(`/api/documents?model=${encodeURIComponent(appState.model)}`);
@@ -27,6 +58,8 @@ export async function fetchDocuments() {
     appState.defaultPrompt = data.default_prompt;
     appState.pricing = data.pricing || {};
     appState.stats = data.stats || {};
+
+    await fetchConsolidatedDocuments();
 
     if (!appState.systemPrompt) {
       const presetKey = appState.currentPreset || "financial";

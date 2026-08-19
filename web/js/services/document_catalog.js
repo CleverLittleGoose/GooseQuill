@@ -18,9 +18,15 @@ export function listConvertedDocuments() {
     });
   });
 
+  // Consolidations sit at the end of their entity's group: they are derived
+  // from the filings above them, and putting them first would push the actual
+  // documents down the list.
+  (appState.consolidatedDocuments || []).forEach((doc) => docs.push(doc));
+
   docs.sort(
     (a, b) =>
       (a.folder || "").localeCompare(b.folder || "") ||
+      Number(Boolean(a.is_consolidated)) - Number(Boolean(b.is_consolidated)) ||
       (a.name || "").localeCompare(b.name || "")
   );
 

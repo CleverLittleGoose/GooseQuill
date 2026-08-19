@@ -34,6 +34,38 @@ export function syncComparePane(page) {
   comparePane.goToPage(page);
 }
 
+/** Whether the active document has a scanned page behind it at all. */
+export function hasScan() {
+  return Boolean(appState.currentViewingPdfPath);
+}
+
+/**
+ * Show or hide the scan pane according to whether there is a scan.
+ *
+ * A consolidation is assembled from many filings and has no single scan. Left
+ * open, the pane kept displaying the previous document's page — a scan of one
+ * document beside the transcript of another, which is worse than showing
+ * nothing at all.
+ */
+export function applyScanAvailability() {
+  const pane = dom.pdfPane();
+  const btn = dom.togglePdfBtn();
+  if (!pane) return;
+
+  if (!hasScan()) {
+    pane.style.display = "none";
+    btn?.classList.remove("active");
+    btn?.setAttribute("aria-pressed", "false");
+    return;
+  }
+
+  if (!studio.compareEnabled) {
+    pane.style.display = "flex";
+    btn?.classList.add("active");
+    btn?.setAttribute("aria-pressed", "true");
+  }
+}
+
 /** Repaint the scan pane for whatever page is current. */
 export function updatePdfPageView() {
   syncComparePane(appState.currentPdfPage);
@@ -114,7 +146,7 @@ export function applyZoom() {
 export function toggleScanPane() {
   const pane = dom.pdfPane();
   const btn = dom.togglePdfBtn();
-  if (!pane) return;
+  if (!pane || !hasScan()) return;
   const wasVisible = pane.style.display !== "none";
   pane.style.display = wasVisible ? "none" : "flex";
   if (btn) {

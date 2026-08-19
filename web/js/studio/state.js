@@ -23,6 +23,15 @@ export const studio = {
   /** `{ [pageNumber]: markdown }` for the active document, plus `preamble`. */
   pagesMap: {},
 
+  /**
+   * What each block calls itself, when that differs from its key.
+   *
+   * Null for a filing, where the key is the page number. Set for a
+   * consolidation, whose blocks are keyed by position because every source
+   * document in it starts again at page 1.
+   */
+  pageLabels: null,
+
   /** The virtualised transcript for pane A. */
   transcript: null,
 

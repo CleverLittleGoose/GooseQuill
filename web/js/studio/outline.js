@@ -10,6 +10,7 @@
  */
 
 import { appState } from "../state.js";
+import { studio } from "./state.js";
 import * as dom from "./dom.js";
 
 // Thumbnails are rendered server-side at this dpi: about 12KB per page against
@@ -25,6 +26,11 @@ let thumbnailObserver = null;
  *   caller's job; the index knows which page was clicked, not what to do about
  *   it, and importing the navigator here would tie the two together for nothing.
  */
+/** What a block calls itself — its key, unless the document says otherwise. */
+function labelFor(page) {
+  return studio.pageLabels ? studio.pageLabels[page] ?? String(page) : String(page);
+}
+
 export function renderPageList({ onSelect }) {
   const container = dom.pageList();
   const countEl = dom.pageCount();
@@ -51,21 +57,29 @@ export function renderPageList({ onSelect }) {
   const pdfPath = appState.currentViewingPdfPath;
   const fragment = document.createDocumentFragment();
 
+  // A consolidation has no scan behind it, so there is nothing to make a
+  // thumbnail from. An empty frame per page would be a column of grey boxes
+  // pretending to be an index; the labels alone are more use.
+  container.classList.toggle("is-textual", !pdfPath);
+
   for (let page = 1; page <= total; page++) {
     const item = document.createElement("div");
     item.className = `studio-page-item ${page === appState.currentPdfPage ? "active" : ""}`;
     item.dataset.page = page;
 
-    const thumbSrc = pdfPath
-      ? `/api/page_image?path=${encodeURIComponent(pdfPath)}&page=${page}&dpi=${THUMBNAIL_DPI}`
-      : "";
+    const label = labelFor(page);
 
-    item.innerHTML = `
-      <div class="studio-page-thumb-frame">
-        <img class="studio-page-thumb" data-src="${thumbSrc}" alt="" loading="lazy" decoding="async">
-      </div>
-      <span class="studio-page-item-label">Page ${page}</span>
-    `;
+    if (pdfPath) {
+      const thumbSrc = `/api/page_image?path=${encodeURIComponent(pdfPath)}&page=${page}&dpi=${THUMBNAIL_DPI}`;
+      item.innerHTML = `
+        <div class="studio-page-thumb-frame">
+          <img class="studio-page-thumb" data-src="${thumbSrc}" alt="" loading="lazy" decoding="async">
+        </div>
+        <span class="studio-page-item-label">Page ${label}</span>
+      `;
+    } else {
+      item.innerHTML = `<span class="studio-page-item-label">Page ${label}</span>`;
+    }
 
     item.addEventListener("click", () => onSelect(page));
     fragment.appendChild(item);

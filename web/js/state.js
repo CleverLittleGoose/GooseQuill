@@ -5,6 +5,14 @@
 export const appState = {
   rootDirectory: "",
   folders: [],
+  /**
+   * Consolidated documents, which have no PDF behind them.
+   *
+   * They are not filings, so they do not belong in `folders` alongside the
+   * scans — but they are readable documents, and until they were listed
+   * somewhere there was no way to open one at all after building it.
+   */
+  consolidatedDocuments: [],
   activeFolder: "ALL",
   selectedFiles: new Set(),
   currentViewingDoc: null,

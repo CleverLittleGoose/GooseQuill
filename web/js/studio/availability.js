@@ -16,6 +16,7 @@
 
 import { studio } from "./state.js";
 import * as dom from "./dom.js";
+import { hasScan } from "./page_view.js";
 
 /** Whether pane A's scanned page is currently on screen. */
 function scanIsVisible() {
@@ -49,11 +50,19 @@ function setAvailability(button, available, reasonWhenNot) {
 
 export function updateToolbarAvailability() {
   setAvailability(
+    dom.togglePdfBtn(),
+    hasScan(),
+    "This document is a consolidation — it has no single scanned page behind it"
+  );
+
+  setAvailability(
     dom.autoSyncBtn(),
     scanIsVisible(),
-    studio.compareEnabled
-      ? "Nothing to sync — Compare hides this document's scan to give both transcripts the width"
-      : "Nothing to sync — the scan is hidden"
+    !hasScan()
+      ? "Nothing to sync — this document has no scan behind it"
+      : studio.compareEnabled
+        ? "Nothing to sync — Compare hides this document's scan to give both transcripts the width"
+        : "Nothing to sync — the scan is hidden"
   );
 
   setAvailability(

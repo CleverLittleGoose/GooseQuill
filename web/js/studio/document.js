@@ -6,7 +6,7 @@
  */
 
 import { appState } from "../state.js";
-import { parsePages } from "../services/page_splitter.js";
+import { parsePages, splitSequential } from "../services/page_splitter.js";
 import { populateDocumentSelect, resolvePdfPath } from "../services/document_catalog.js";
 import { switchStudioView } from "../components/header.js";
 import { studio } from "./state.js";
@@ -14,7 +14,8 @@ import * as dom from "./dom.js";
 import * as tabs from "./tabs.js";
 import { renderPageList } from "./outline.js";
 import { updateDisplay, updateSaveButtonState } from "./render.js";
-import { updatePdfPageView, applyZoom } from "./page_view.js";
+import { updatePdfPageView, applyZoom, applyScanAvailability } from "./page_view.js";
+import { updateToolbarAvailability } from "./availability.js";
 import { goToPage } from "./navigation.js";
 import { setDiffEnabled, clearDiffCache } from "./diff.js";
 
@@ -43,6 +44,8 @@ export async function activateTab(index, startPage = null) {
   tabs.setActiveIndex(index);
 
   setupDocState(tab.doc);
+  applyScanAvailability();
+  updateToolbarAvailability();
   renderTabStrip();
   tabs.updateNavTabLabel();
   updateStudioPresence();
@@ -100,14 +103,20 @@ function renderTabStrip() {
 /** Point the shared document state at a document, and re-label the chrome. */
 function setupDocState(doc) {
   appState.currentViewingDoc = doc;
-  appState.currentViewingPdfPath = resolvePdfPath(doc);
+  // A consolidation is assembled from many filings; there is no single scan
+  // behind it, and resolving one would point the scan pane at a file that does
+  // not exist.
+  appState.currentViewingPdfPath = doc.is_consolidated ? null : resolvePdfPath(doc);
   appState.currentViewingMarkdownPath = doc.output_path || doc.path;
   appState.currentPdfPage = 1;
   appState.totalPdfPages = doc.total_pages || 1;
 
   const meta = dom.docMeta();
   if (meta) {
-    meta.textContent = `${doc.total_pages || 1} pages • ${(doc.file_size / 1024).toFixed(0)} KB • ${doc.folder}`;
+    const size = `${((doc.file_size || 0) / 1024).toFixed(0)} KB`;
+    meta.textContent = doc.is_consolidated
+      ? `Consolidated • ${size} • ${doc.folder}`
+      : `${doc.total_pages || 1} pages • ${size} • ${doc.folder}`;
   }
 
   // Pane A names itself through its picker, the same way pane B does.
@@ -135,7 +144,20 @@ async function loadAndRender(doc) {
     // The server resolves a PDF path to its Markdown/<stem>.md; keep the
     // resolved path so saving writes back to the file we actually read.
     if (data.path) appState.currentViewingMarkdownPath = data.path;
-    studio.pagesMap = parsePages(data.content);
+
+    if (doc.is_consolidated) {
+      // Every source document in a consolidation starts again at page 1, so
+      // keying by the page number written in the file would have each one
+      // overwrite the last. Blocks are keyed by position and labelled with the
+      // page they claim to be — the same split the Combiner preview uses.
+      const { pages, labels } = splitSequential(data.content);
+      studio.pagesMap = pages;
+      studio.pageLabels = labels;
+      appState.totalPdfPages = Object.keys(pages).filter((k) => /^\d+$/.test(k)).length || 1;
+    } else {
+      studio.pagesMap = parsePages(data.content);
+      studio.pageLabels = null;
+    }
 
     studio.rawEditorDirty = false;
     renderPageList({ onSelect: (page) => goToPage(page, true) });
