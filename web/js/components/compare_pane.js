@@ -49,8 +49,8 @@ export class ComparePane {
           <option value="">Choose a converted document…</option>
         </select>
         <div class="btn-group compare-view-toggle" role="group" aria-label="Pane ${this.label} view">
-          <button type="button" class="btn btn-sm btn-secondary active" data-view="transcript" title="Show the converted text">📄 Text</button>
-          <button type="button" class="btn btn-sm btn-secondary" data-view="pdf" title="Show the scanned page">🖼️ Scan</button>
+          <button type="button" class="btn btn-sm btn-secondary active" data-view="transcript" title="Show the converted text">Text</button>
+          <button type="button" class="btn btn-sm btn-secondary" data-view="pdf" title="Show the scanned page">Scan</button>
         </div>
       </div>
       <div class="compare-pane-body">

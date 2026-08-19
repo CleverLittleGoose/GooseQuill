@@ -116,6 +116,9 @@ export function toggleScanPane() {
   if (!pane) return;
   const wasVisible = pane.style.display !== "none";
   pane.style.display = wasVisible ? "none" : "flex";
-  if (btn) btn.classList.toggle("active", !wasVisible);
+  if (btn) {
+    btn.classList.toggle("active", !wasVisible);
+    btn.setAttribute("aria-pressed", String(!wasVisible));
+  }
   if (!wasVisible) updatePdfPageView();
 }

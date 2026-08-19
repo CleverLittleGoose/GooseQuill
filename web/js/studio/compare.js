@@ -9,6 +9,7 @@ import { studio } from "./state.js";
 import * as dom from "./dom.js";
 import { updatePdfPageView, syncComparePane } from "./page_view.js";
 import { setDiffEnabled, updateDiffAvailability, clearDiffCache } from "./diff.js";
+import { updateSearchPanePicker } from "./search.js";
 
 /**
  * Turn the side-by-side view on or off.
@@ -25,7 +26,11 @@ export function setCompareEnabled(enabled) {
 
   studio.compareEnabled = enabled;
   host.style.display = enabled ? "flex" : "none";
-  dom.compareBtn()?.classList.toggle("active", enabled);
+  const compareBtn = dom.compareBtn();
+  if (compareBtn) {
+    compareBtn.classList.toggle("active", enabled);
+    compareBtn.setAttribute("aria-pressed", String(enabled));
+  }
 
   const linkBtn = dom.linkPagesBtn();
   if (linkBtn) linkBtn.style.display = enabled ? "inline-flex" : "none";
@@ -39,6 +44,7 @@ export function setCompareEnabled(enabled) {
         },
         onDocumentLoaded: () => {
           updateDiffAvailability();
+          updateSearchPanePicker();
           // A document swap in B invalidates every cached comparison.
           clearDiffCache();
           if (studio.diffEnabled) setDiffEnabled(true);
@@ -50,13 +56,16 @@ export function setCompareEnabled(enabled) {
     // Two documents need the width more than A's scan does.
     if (pdfPane) pdfPane.style.display = "none";
     togglePdfBtn?.classList.remove("active");
+    togglePdfBtn?.setAttribute("aria-pressed", "false");
     updateLinkPagesButton();
     updateDiffAvailability();
+    updateSearchPanePicker();
     return;
   }
 
   if (studio.diffEnabled) setDiffEnabled(false);
   updateDiffAvailability();
+  updateSearchPanePicker();
   if (pdfPane) {
     pdfPane.style.display = "flex";
     togglePdfBtn?.classList.add("active");
@@ -77,6 +86,11 @@ export function toggleLinkPages(currentPage) {
 export function updateLinkPagesButton() {
   const btn = dom.linkPagesBtn();
   if (!btn) return;
+  // State goes on the button, not into its text: the label is an inline SVG
+  // now, and writing textContent would delete it.
   btn.classList.toggle("active", studio.linkPages);
-  btn.textContent = studio.linkPages ? "🔗 Link" : "🔗 Link (Off)";
+  btn.setAttribute("aria-pressed", String(studio.linkPages));
+  btn.title = studio.linkPages
+    ? "Both documents stay on the same page number"
+    : "Each document scrolls on its own";
 }

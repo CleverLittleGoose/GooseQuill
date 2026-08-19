@@ -16,11 +16,6 @@ import { goToPage } from "./navigation.js";
 // modes give different answers for the same pair.
 const diffCache = new Map();
 
-const MODE_LABELS = {
-  source: { label: "Markdown", title: "Comparing the Markdown as written — structural edits show up. Click to compare the words instead." },
-  prose: { label: "Words", title: "Comparing the words the document renders to — formatting is ignored. Click to compare the Markdown instead." }
-};
-
 /** Throw away every cached comparison — a document changed underneath them. */
 export function clearDiffCache() {
   diffCache.clear();
@@ -29,23 +24,16 @@ export function clearDiffCache() {
 /** Switch between comparing the Markdown and comparing the rendered words. */
 export function setDiffMode(mode) {
   studio.diffMode = mode === "prose" ? "prose" : "source";
-  updateDiffModeButton();
+  updateDiffModeControl();
   clearDiffCache();
   if (studio.diffEnabled) setDiffEnabled(true);
 }
 
-export function toggleDiffMode() {
-  setDiffMode(studio.diffMode === "source" ? "prose" : "source");
-}
-
-function updateDiffModeButton() {
-  const btn = dom.diffModeBtn();
-  if (!btn) return;
-  const { label, title } = MODE_LABELS[studio.diffMode] || MODE_LABELS.source;
-  btn.textContent = label;
-  btn.title = title;
-  btn.style.display = studio.diffEnabled ? "inline-flex" : "none";
-  btn.setAttribute("aria-label", `Comparing ${label.toLowerCase()}`);
+function updateDiffModeControl() {
+  const wrap = dom.diffModeWrap();
+  const select = dom.diffModeSelect();
+  if (wrap) wrap.style.display = studio.diffEnabled ? "inline-flex" : "none";
+  if (select && select.value !== studio.diffMode) select.value = studio.diffMode;
 }
 
 /** Turn change highlighting on or off across both panes. */
@@ -56,11 +44,15 @@ export function setDiffEnabled(enabled) {
   studio.diffEnabled = enabled && canDiff;
   clearDiffCache();
 
-  dom.diffBtn()?.classList.toggle("active", studio.diffEnabled);
+  const diffBtn = dom.diffBtn();
+  if (diffBtn) {
+    diffBtn.classList.toggle("active", studio.diffEnabled);
+    diffBtn.setAttribute("aria-pressed", String(studio.diffEnabled));
+  }
   [dom.diffSummary(), dom.diffPrevBtn(), dom.diffNextBtn()].forEach((el) => {
     if (el) el.style.display = studio.diffEnabled ? "inline-flex" : "none";
   });
-  updateDiffModeButton();
+  updateDiffModeControl();
 
   if (!studio.diffEnabled) {
     studio.diffChangedPages = [];
@@ -175,5 +167,5 @@ export function updateDiffAvailability() {
     : "Choose a document in pane B first";
 
   if (!canDiff && studio.diffEnabled) setDiffEnabled(false);
-  updateDiffModeButton();
+  updateDiffModeControl();
 }

@@ -36,13 +36,16 @@ export const searchInput = () => byId("studioSearchInput");
 export const searchCount = () => byId("studioSearchCount");
 export const searchToggleBtn = () => byId("studioSearchToggleBtn");
 export const searchCaseBtn = () => byId("studioSearchCaseBtn");
+export const searchPanePicker = () => byId("studioSearchPanePicker");
+export const searchPaneButtons = () => [byId("studioSearchPaneABtn"), byId("studioSearchPaneBBtn")].filter(Boolean);
 export const searchNavButtons = () => [byId("studioSearchPrevBtn"), byId("studioSearchNextBtn")].filter(Boolean);
 
 /* Compare & diff */
 export const compareBtn = () => byId("studioCompareBtn");
 export const linkPagesBtn = () => byId("studioLinkPagesBtn");
 export const diffBtn = () => byId("studioDiffBtn");
-export const diffModeBtn = () => byId("studioDiffModeBtn");
+export const diffModeWrap = () => byId("studioDiffModeWrap");
+export const diffModeSelect = () => byId("studioDiffModeSelect");
 export const diffSummary = () => byId("studioDiffSummary");
 export const diffPrevBtn = () => byId("studioDiffPrevBtn");
 export const diffNextBtn = () => byId("studioDiffNextBtn");

@@ -356,7 +356,7 @@ export function renderDocuments() {
           </svg>
           <div>
             <div class="doc-name-text" title="${doc.name}">${doc.name}</div>
-            <div class="doc-entity-tag">📁 ${doc.folder}</div>
+            <div class="doc-entity-tag">${doc.folder}</div>
           </div>
         </div>
       </td>

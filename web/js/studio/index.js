@@ -21,14 +21,14 @@ import * as dom from "./dom.js";
 import { setFormat, setScope, getActiveMarkdownText } from "./render.js";
 import { setZoom, toggleScanPane } from "./page_view.js";
 import { stepPage } from "./navigation.js";
-import { toggleSearchBar, closeSearchBar, toggleMatchCase, handleSearchInput, handleSearchKeydown, navigateMatch } from "./search.js";
-import { setDiffEnabled, toggleDiffMode, goToChangedPage } from "./diff.js";
+import { toggleSearchBar, closeSearchBar, toggleMatchCase, handleSearchInput, handleSearchKeydown, navigateMatch, setSearchPane } from "./search.js";
+import { setDiffEnabled, setDiffMode, goToChangedPage } from "./diff.js";
 import { toggleCompare, toggleLinkPages } from "./compare.js";
 import { initEditor } from "./editor.js";
 import { initStudioSplitters } from "./panes.js";
 import { initStudioShortcuts } from "./shortcuts.js";
-import { initDocumentSwitcher } from "./switcher.js";
-import { openDocumentInStudio, renderStudioView } from "./document.js";
+import { initDocumentSwitcher, openDocumentSwitcher } from "./switcher.js";
+import { openDocumentInStudio, renderStudioView, updateStudioPresence } from "./document.js";
 
 export function initStudio() {
   wireToolbar();
@@ -43,6 +43,9 @@ export function initStudio() {
 
   wireScrollSync();
   wireEvents();
+
+  dom.byId("studioEmptyOpenBtn")?.addEventListener("click", openDocumentSwitcher);
+  updateStudioPresence();
 }
 
 function wireToolbar() {
@@ -57,7 +60,10 @@ function wireToolbar() {
     studio.autoSync = !studio.autoSync;
     const btn = event.currentTarget;
     btn.classList.toggle("active", studio.autoSync);
-    btn.textContent = studio.autoSync ? "⚡ Sync" : "⚡ Sync (Off)";
+    btn.setAttribute("aria-pressed", String(studio.autoSync));
+    btn.title = studio.autoSync
+      ? "Keep the scan in step with the transcript as you scroll"
+      : "The scan no longer follows the transcript";
   });
 
   dom.byId("studioCopyBtn")?.addEventListener("click", (event) => {
@@ -97,6 +103,10 @@ function wireFindBar() {
   dom.byId("studioSearchPrevBtn")?.addEventListener("click", () => navigateMatch(-1));
   dom.byId("studioSearchNextBtn")?.addEventListener("click", () => navigateMatch(1));
 
+  dom.searchPaneButtons().forEach((btn) => {
+    btn.addEventListener("click", () => setSearchPane(btn.dataset.pane));
+  });
+
   const input = dom.searchInput();
   input?.addEventListener("input", (e) => handleSearchInput(e.target.value));
   input?.addEventListener("keydown", handleSearchKeydown);
@@ -123,7 +133,7 @@ function wireCompareAndDiff() {
   dom.linkPagesBtn()?.addEventListener("click", () => toggleLinkPages(appState.currentPdfPage));
 
   dom.diffBtn()?.addEventListener("click", () => setDiffEnabled(!studio.diffEnabled));
-  dom.diffModeBtn()?.addEventListener("click", toggleDiffMode);
+  dom.diffModeSelect()?.addEventListener("change", (e) => setDiffMode(e.target.value));
   dom.diffPrevBtn()?.addEventListener("click", () => goToChangedPage(-1));
   dom.diffNextBtn()?.addEventListener("click", () => goToChangedPage(1));
 }

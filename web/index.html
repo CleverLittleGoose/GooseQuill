@@ -37,15 +37,15 @@
             </svg>
             <span>Workspace</span>
           </button>
-          <button class="studio-tab-btn" id="tabNavStudio" data-view="studio" style="display: none;">
+          <button class="studio-tab-btn" id="tabNavStudio" data-view="studio">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
               <polyline points="14 2 14 8 20 8"></polyline>
               <line x1="16" y1="13" x2="8" y2="13"></line>
               <line x1="16" y1="17" x2="8" y2="17"></line>
             </svg>
-            <span id="tabNavStudioDocName">Document Studio</span>
-            <span class="tab-badge active-tag" id="topNavStudioDocBadge">Active</span>
+            <span id="tabNavStudioDocName">Studio</span>
+            <span class="tab-badge active-tag" id="topNavStudioDocBadge" style="display: none;">Active</span>
           </button>
           <button class="studio-tab-btn" id="tabNavSearch" data-view="search">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -364,7 +364,7 @@
         <div class="search-view-container">
           <div class="search-view-header">
             <div class="search-view-input-group">
-              <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
@@ -404,6 +404,15 @@
                   <span id="studioCombinerSourceSummary" class="text-accent">377 converted</span>
                 </label>
                 <select id="studioCombinerSourceFolderSelect" class="form-select form-select-sm"></select>
+                <!--
+                  Off by default: a consolidation contains every document in the
+                  folder it was made from, so offering it beside those documents
+                  makes "Select Entity" include everything twice.
+                -->
+                <label class="checkbox-pill mt-2" title="Consolidations already contain the documents they were made from">
+                  <input type="checkbox" id="studioCombinerIncludeConsolidated">
+                  <span>Include previously consolidated files</span>
+                </label>
               </div>
 
               <!-- Instant Search in Combiner -->
@@ -463,15 +472,15 @@
               <div class="combiner-toggles-bar mt-2">
                 <label class="checkbox-pill">
                   <input type="checkbox" id="studioCombinerIncludeToc" checked>
-                  <span>📋 Interactive Table of Contents</span>
+                  <span>Interactive table of contents</span>
                 </label>
                 <label class="checkbox-pill">
                   <input type="checkbox" id="studioCombinerIncludeSourceMeta" checked>
-                  <span>📄 Source Metadata Banners</span>
+                  <span>Source metadata banners</span>
                 </label>
                 <label class="checkbox-pill">
                   <input type="checkbox" id="studioCombinerStripHeaders" checked>
-                  <span>✨ Clean Duplicate Headers</span>
+                  <span>Clean duplicate headers</span>
                 </label>
               </div>
             </div>
@@ -699,7 +708,28 @@
       <!-- VIEW 5: DEDICATED DOCUMENT STUDIO         -->
       <!-- ========================================== -->
       <div class="studio-view" id="viewStudio" style="display: none;">
-        <div class="studio-workspace-container">
+        <!--
+          Studio with nothing open. It is a permanent destination in the nav
+          now, so it has to answer "what is this?" for someone who arrived here
+          before opening anything.
+        -->
+        <div class="studio-empty" id="studioEmptyState" style="display: none;">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          <h2>Read a document against its scan</h2>
+          <p>
+            Open a converted filing to see its transcript beside the page it came from,
+            search inside it, or compare it with another year.
+          </p>
+          <button class="btn btn-primary" id="studioEmptyOpenBtn">Open a document</button>
+          <p class="studio-empty-hint">or press <kbd>⌘</kbd><kbd>K</kbd> from anywhere</p>
+        </div>
+
+        <div class="studio-workspace-container" id="studioWorkspaceContainer">
           <!-- Studio Sub-Header & Controls Bar -->
           <div class="studio-sub-header">
             <div class="studio-doc-meta">
@@ -718,6 +748,13 @@
               Grouped rather than flat. Twelve controls of identical weight in
               one row gave no clue which of them changed what you were reading,
               which turned something on beside it, or which wrote to disk.
+            <!--
+              Grouped, and captioned rather than pictographic. Twelve controls
+              of identical weight in one row gave no clue which of them changed
+              what you were reading, which turned something on beside it, and
+              which wrote to disk. Icons are drawn rather than typed: emoji
+              render differently on every platform, carry their own colour, and
+              cannot be made to match anything around them.
             -->
             <div class="studio-header-actions">
               <div class="studio-toolbar-group" role="group" aria-label="What to show">
@@ -734,25 +771,62 @@
               <div class="studio-toolbar-sep" aria-hidden="true"></div>
 
               <div class="studio-toolbar-group" role="group" aria-label="Panes">
-                <button class="btn btn-sm btn-secondary active" id="studioTogglePdfBtn" title="Show or hide the scanned page">🖼️ Scan</button>
-                <button class="btn btn-sm btn-secondary" id="studioCompareBtn" title="Open a second document beside this one">⇔ Compare</button>
-                <button class="btn btn-sm btn-secondary active" id="studioAutoScrollBtn" title="Keep the scan in step with the transcript as you scroll">⚡ Sync</button>
+                <button class="btn btn-sm btn-secondary active" id="studioTogglePdfBtn" title="Show or hide the scanned page" aria-pressed="true">
+                  <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  <span>Scan</span>
+                </button>
+                <button class="btn btn-sm btn-secondary" id="studioCompareBtn" title="Open a second document beside this one" aria-pressed="false">
+                  <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="7" height="16" rx="1"/><rect x="14" y="4" width="7" height="16" rx="1"/></svg>
+                  <span>Compare</span>
+                </button>
+                <button class="btn btn-sm btn-secondary active btn-icon-label" id="studioAutoScrollBtn" title="Keep the scan in step with the transcript as you scroll" aria-label="Keep the scan in step with the transcript" aria-pressed="true">
+                  <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                </button>
               </div>
 
               <div class="studio-toolbar-group studio-diff-group" role="group" aria-label="Changes">
-                <button class="btn btn-sm btn-secondary active" id="studioLinkPagesBtn" title="Keep both documents on the same page number" style="display: none;">🔗 Link</button>
-                <button class="btn btn-sm btn-secondary" id="studioDiffBtn" title="Highlight what changed between the two documents" style="display: none;">± Diff</button>
-                <button class="btn btn-sm btn-secondary diff-mode-btn" id="studioDiffModeBtn" title="Comparing the Markdown as written — structural edits show up. Click to compare the words instead." style="display: none;">Markdown</button>
+                <button class="btn btn-sm btn-secondary active btn-icon-label" id="studioLinkPagesBtn" title="Keep both documents on the same page number" aria-label="Keep both documents on the same page number" aria-pressed="true" style="display: none;">
+                  <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                </button>
+                <button class="btn btn-sm btn-secondary" id="studioDiffBtn" title="Highlight what changed between the two documents" aria-pressed="false" style="display: none;">
+                  <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="8" x2="12" y2="8"/><line x1="8" y1="4" x2="8" y2="12"/><line x1="12" y1="17" x2="20" y2="17"/></svg>
+                  <span>Highlight changes</span>
+                </button>
+                <!--
+                  A named choice, not a chip. This read "vs MARKDOWN", which
+                  told you a word but not what the word did to your comparison.
+                -->
+                <label class="studio-diff-mode" id="studioDiffModeWrap" style="display: none;">
+                  <span class="studio-diff-mode-label">Comparing</span>
+                  <select id="studioDiffModeSelect" class="form-select form-select-sm" aria-label="What the comparison looks at">
+                    <option value="source">text and formatting</option>
+                    <option value="prose">text only</option>
+                  </select>
+                </label>
                 <span class="diff-summary" id="studioDiffSummary" style="display: none;"></span>
-                <button class="btn btn-sm btn-secondary btn-icon-label" id="studioDiffPrevBtn" title="Previous changed page (p)" aria-label="Previous changed page" aria-keyshortcuts="p" style="display: none;">&uarr;</button>
-                <button class="btn btn-sm btn-secondary btn-icon-label" id="studioDiffNextBtn" title="Next changed page (n)" aria-label="Next changed page" aria-keyshortcuts="n" style="display: none;">&darr;</button>
+                <button class="btn btn-sm btn-secondary btn-icon-label" id="studioDiffPrevBtn" title="Previous change (p)" aria-label="Previous change" aria-keyshortcuts="p" style="display: none;">
+                  <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>
+                </button>
+                <button class="btn btn-sm btn-secondary btn-icon-label" id="studioDiffNextBtn" title="Next change (n)" aria-label="Next change" aria-keyshortcuts="n" style="display: none;">
+                  <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
               </div>
 
               <div class="studio-toolbar-group studio-toolbar-actions" role="group" aria-label="Document actions">
-                <button class="btn btn-sm btn-secondary" id="studioSearchToggleBtn" title="Find in this document (Cmd+F)" aria-keyshortcuts="Meta+F Control+F">🔍 Find</button>
-                <button class="btn btn-sm btn-secondary" id="studioSaveBtn" title="Save edits to the .md file on disk" style="display: none;">💾 Save</button>
-                <button class="btn btn-sm btn-secondary btn-icon-label" id="studioCopyBtn" title="Copy the markdown to the clipboard" aria-label="Copy markdown">⧉</button>
-                <button class="btn btn-sm btn-secondary btn-icon-label" id="studioDownloadBtn" title="Download the markdown file" aria-label="Download markdown">⬇</button>
+                <button class="btn btn-sm btn-secondary" id="studioSearchToggleBtn" title="Find in this document (Cmd+F)" aria-keyshortcuts="Meta+F Control+F">
+                  <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <span>Find</span>
+                </button>
+                <button class="btn btn-sm btn-secondary" id="studioSaveBtn" title="Save edits to the .md file on disk" style="display: none;">
+                  <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  <span>Save</span>
+                </button>
+                <button class="btn btn-sm btn-secondary btn-icon-label" id="studioCopyBtn" title="Copy the markdown to the clipboard" aria-label="Copy markdown">
+                  <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </button>
+                <button class="btn btn-sm btn-primary btn-icon-label" id="studioDownloadBtn" title="Download the markdown file" aria-label="Download markdown">
+                  <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </button>
               </div>
             </div>
           </div>
@@ -792,6 +866,15 @@
                     aria-describedby="studioSearchCount"
                   />
                   <button class="search-case-btn" id="studioSearchCaseBtn" title="Match Case" aria-label="Toggle case sensitivity" aria-pressed="false">Aa</button>
+                </div>
+                <!--
+                  Which document is being searched. Appears only while two are
+                  open — with one, there is nothing to choose between, and a
+                  disabled toggle is just clutter.
+                -->
+                <div class="btn-group search-pane-picker" id="studioSearchPanePicker" role="group" aria-label="Which document to search" style="display: none;">
+                  <button class="btn btn-xs btn-secondary active" id="studioSearchPaneABtn" data-pane="A" title="Search the document on the left">A</button>
+                  <button class="btn btn-xs btn-secondary" id="studioSearchPaneBBtn" data-pane="B" title="Search the document on the right">B</button>
                 </div>
                 <div class="viewer-search-controls">
                   <span class="search-count" id="studioSearchCount" role="status" aria-live="polite">0/0</span>
