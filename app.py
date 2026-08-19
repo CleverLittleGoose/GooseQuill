@@ -806,19 +806,22 @@ if __name__ == "__main__":
 
     print(f"Starting GooseQuill on http://{host}:{port} ...")
     if reload_enabled:
-        print("Auto-reload is on; the server will restart when the code changes.")
+        print("Auto-reload is on: the server restarts when Python changes. Frontend edits need only a browser refresh.")
 
-    uvicorn.run(
-        "app:app",
-        host=host,
-        port=port,
-        reload=reload_enabled,
-        # Watch the code, and only the code. Uvicorn's default is the working
-        # directory, which here contains the documents folder and the page
-        # cache — so converting anything rewrote files under the watcher and
-        # restarted the server in the middle of the job that was writing them.
-        reload_dirs=[str(PROJECT_ROOT / "goosequill"), str(PROJECT_ROOT / "web"), str(PROJECT_ROOT)],
-        reload_includes=["*.py", "*.js", "*.css", "*.html"],
-        reload_excludes=["Accounts/*", ".cache/*", "venv/*", "documents/*", "tests/*"],
-    )
+    options = {"host": host, "port": port, "reload": reload_enabled}
+
+    if reload_enabled:
+        # Watch the Python package and this file — not the working directory,
+        # which is uvicorn's default and which here contains the documents
+        # folder and the page cache.
+        #
+        # No reload_includes/excludes: without watchfiles installed uvicorn
+        # falls back to StatReload, which ignores them and watches only *.py.
+        # That is the behaviour wanted anyway. Frontend files need no reload at
+        # all — they are served from disk, and the composed page is cached
+        # against its parts' mtimes — so editing a view or a stylesheet shows up
+        # on a browser refresh with the server left alone.
+        options["reload_dirs"] = [str(PROJECT_ROOT / "goosequill"), str(PROJECT_ROOT)]
+
+    uvicorn.run("app:app", **options)
 

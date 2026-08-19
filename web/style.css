@@ -3601,3 +3601,23 @@ body.is-resizing-panes .studio-pane {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-xs);
 }
+
+/*
+ * A control that does nothing in the current mode.
+ *
+ * Dimmed rather than hidden: a button that disappears and comes back as you
+ * change modes is its own kind of confusing, and nobody learns a feature they
+ * never see. The tooltip says why it is asleep.
+ */
+.btn.is-inert {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.btn.is-inert.active {
+  /* An inert toggle must not also look switched on. */
+  background-color: transparent;
+  border-color: var(--border-color);
+  color: var(--text-muted);
+  box-shadow: none;
+}

@@ -29,6 +29,7 @@ import { initStudioSplitters } from "./panes.js";
 import { initStudioShortcuts } from "./shortcuts.js";
 import { initDocumentSwitcher, openDocumentSwitcher } from "./switcher.js";
 import { openDocumentInStudio, renderStudioView, updateStudioPresence } from "./document.js";
+import { updateToolbarAvailability } from "./availability.js";
 
 export function initStudio() {
   wireToolbar();
@@ -46,6 +47,7 @@ export function initStudio() {
 
   dom.byId("studioEmptyOpenBtn")?.addEventListener("click", openDocumentSwitcher);
   updateStudioPresence();
+  updateToolbarAvailability();
 }
 
 function wireToolbar() {

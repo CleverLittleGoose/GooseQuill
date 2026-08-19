@@ -10,6 +10,7 @@
 import { appState } from "../state.js";
 import { studio } from "./state.js";
 import * as dom from "./dom.js";
+import { updateToolbarAvailability } from "./availability.js";
 
 // "fit-page" is the default because the previous behaviour — fit-to-width only —
 // meant a portrait page was always taller than its pane, so you could never see
@@ -121,4 +122,5 @@ export function toggleScanPane() {
     btn.setAttribute("aria-pressed", String(!wasVisible));
   }
   if (!wasVisible) updatePdfPageView();
+  updateToolbarAvailability();
 }

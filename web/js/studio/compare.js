@@ -10,6 +10,7 @@ import * as dom from "./dom.js";
 import { updatePdfPageView, syncComparePane } from "./page_view.js";
 import { setDiffEnabled, updateDiffAvailability, clearDiffCache } from "./diff.js";
 import { updateSearchPanePicker } from "./search.js";
+import { updateToolbarAvailability } from "./availability.js";
 
 /**
  * Turn the side-by-side view on or off.
@@ -45,6 +46,7 @@ export function setCompareEnabled(enabled) {
         onDocumentLoaded: () => {
           updateDiffAvailability();
           updateSearchPanePicker();
+          updateToolbarAvailability();
           // A document swap in B invalidates every cached comparison.
           clearDiffCache();
           if (studio.diffEnabled) setDiffEnabled(true);
@@ -60,6 +62,7 @@ export function setCompareEnabled(enabled) {
     updateLinkPagesButton();
     updateDiffAvailability();
     updateSearchPanePicker();
+    updateToolbarAvailability();
     return;
   }
 
