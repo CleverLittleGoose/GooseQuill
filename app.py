@@ -39,6 +39,35 @@ from goosequill.services import (
 from goosequill.services.search_service import CONSOLIDATED_DIR_NAME, is_consolidated
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+
+class _QuietAssetAccessLogs(logging.Filter):
+    """Drop successful access-log lines for the endpoints that fire constantly.
+
+    Scrolling one 214-page document asks for a page image per thumbnail and per
+    preview, so a minute of ordinary reading buried anything worth seeing under
+    hundreds of near-identical 200 OK lines. Failures still come through — a
+    404 or a 500 on these routes is exactly what you would want to be told
+    about — and GOOSEQUILL_VERBOSE_ACCESS=1 brings all of them back.
+    """
+
+    NOISY_PATHS = ("/api/page_image", "/favicon.ico", "/style.css", "/vendor/", "/js/")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if not isinstance(args, tuple) or len(args) < 5:
+            return True
+        path, status = args[2], args[4]
+        try:
+            if int(status) >= 400:
+                return True
+        except (TypeError, ValueError):
+            return True
+        return not any(str(path).startswith(prefix) for prefix in self.NOISY_PATHS)
+
+
+if os.environ.get("GOOSEQUILL_VERBOSE_ACCESS", "0") != "1":
+    logging.getLogger("uvicorn.access").addFilter(_QuietAssetAccessLogs())
 logger = logging.getLogger("app")
 
 class EndpointFilter(logging.Filter):
@@ -169,6 +198,10 @@ class CombineMarkdownRequest(BaseModel):
     strip_original_headers: bool = True
     sort_mode: str = "custom"
     save_to_disk: bool = True
+    # Whether the assembled document comes back in the response. Off for a
+    # whole-workspace build, which is written to disk and streamed on request
+    # rather than carried through the tab.
+    return_content: bool = True
 
 
 def run_conversion_task(req: ConvertRequest):
@@ -587,6 +620,23 @@ def search_documents(
     )
 
 
+@app.get("/api/download_markdown")
+def download_markdown(path: str):
+    """Stream a Markdown file from the workspace as a download.
+
+    Exists so the browser never has to hold a consolidated document in memory
+    to save it: the file is on disk, and this hands it to the download manager
+    a chunk at a time.
+    """
+    target = _resolve_within_root(path)
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="File not found.")
+    if target.suffix.lower() != ".md":
+        raise HTTPException(status_code=400, detail="Only Markdown files can be downloaded.")
+
+    return FileResponse(target, media_type="text/markdown", filename=target.name)
+
+
 @app.get("/api/converted_markdowns")
 def get_converted_markdowns():
     """Discover all converted markdown files across all folders in workspace."""
@@ -636,7 +686,7 @@ def combine_markdown(req: CombineMarkdownRequest):
             saved_p = MarkdownCombinerService.save_combined_document(target_path, result["content"])
             saved_path = str(saved_p)
 
-        return {
+        response = {
             "status": "success",
             "title": result["title"],
             "total_documents": result["total_documents"],
@@ -644,9 +694,18 @@ def combine_markdown(req: CombineMarkdownRequest):
             "total_words": result["total_words"],
             "total_chars": result["total_chars"],
             "saved_path": saved_path,
-            "content": result["content"],
             "documents": result["documents"]
         }
+
+        # A whole-workspace consolidation is tens of megabytes. Sending it back
+        # so the browser can hold it as a string, hand it to a textarea and
+        # split it again is the work this tool exists to avoid doing in a
+        # browser. When it has been written to disk the caller can be told
+        # where, and stream it from there if it wants it.
+        if req.return_content:
+            response["content"] = result["content"]
+
+        return response
     except HTTPException:
         raise
     except Exception as e:
@@ -674,5 +733,20 @@ if __name__ == "__main__":
         )
 
     print(f"Starting GooseQuill on http://{host}:{port} ...")
-    uvicorn.run("app:app", host=host, port=port, reload=reload_enabled)
+    if reload_enabled:
+        print("Auto-reload is on; the server will restart when the code changes.")
+
+    uvicorn.run(
+        "app:app",
+        host=host,
+        port=port,
+        reload=reload_enabled,
+        # Watch the code, and only the code. Uvicorn's default is the working
+        # directory, which here contains the documents folder and the page
+        # cache — so converting anything rewrote files under the watcher and
+        # restarted the server in the middle of the job that was writing them.
+        reload_dirs=[str(PROJECT_ROOT / "goosequill"), str(PROJECT_ROOT / "web"), str(PROJECT_ROOT)],
+        reload_includes=["*.py", "*.js", "*.css", "*.html"],
+        reload_excludes=["Accounts/*", ".cache/*", "venv/*", "documents/*", "tests/*"],
+    )
 
