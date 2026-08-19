@@ -64,6 +64,9 @@ function renderBatchJobsList(jobs) {
   const listEl = document.getElementById("batchJobsStandaloneList");
   if (!listEl) return;
 
+  // The list opens in its loading state; whatever we do below settles it.
+  listEl.setAttribute("aria-busy", "false");
+
   if (jobs.length === 0) {
     listEl.innerHTML = `
       <div style="padding: 60px 20px; text-align: center; background-color: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
@@ -87,7 +90,9 @@ function renderBatchJobsList(jobs) {
 
     if (job.status === "JOB_STATE_SUCCEEDED") {
       if (job.is_collected) {
-        actionBtn = `<span class="badge" style="color: #34d399; font-weight: 600;">✓ Markdown Assembled</span>`;
+        actionBtn = `<span class="badge" style="color: #34d399; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          Markdown Assembled</span>`;
       } else {
         actionBtn = `<button class="btn btn-sm btn-accent collect-batch-btn" data-id="${job.id}">Collect & Assemble .md</button>`;
       }
@@ -147,7 +152,7 @@ export async function submitOvernightBatch(files) {
     if (res.ok) {
       appState.recentLogs.push({ text: `[INFO] Submitted overnight Batch API job for ${files.length} document(s) (50% discount).`, type: "normal" });
       eventBus.emit("logs:updated");
-      notifyCompletion("Overnight Batch Submitted! 🌙", `${files.length} document(s) queued for overnight processing.`);
+      notifyCompletion("Overnight Batch Submitted", `${files.length} document(s) queued for overnight processing.`);
       switchStudioView("batches");
       await fetchBatchJobs(true);
     } else {

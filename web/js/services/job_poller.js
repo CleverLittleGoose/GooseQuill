@@ -96,7 +96,7 @@ export async function checkJobStatus() {
       stopJobPolling();
       if (wasJobRunning) {
         wasJobRunning = false;
-        notifyCompletion("Conversion Queue Complete! 🎉", "All selected documents have been transcribed into Markdown.");
+        notifyCompletion("Conversion Queue Complete", "All selected documents have been transcribed into Markdown.");
       }
       if (progressBanner && progressBanner.style.display !== "none") {
         progressBanner.style.display = "none";

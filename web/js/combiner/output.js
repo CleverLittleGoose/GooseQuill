@@ -48,7 +48,7 @@ export async function saveCombinedMarkdown() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Could not save consolidated file");
 
-    showToast("Consolidated File Saved! 🎉", `Saved to ${data.saved_path}`);
+    showToast("Consolidated File Saved", `Saved to ${data.saved_path}`);
     appState.recentLogs.push({
       text: `[INFO] Consolidated ${data.total_documents} markdown documents (${data.total_pages} pages) into ${data.saved_path}`,
       type: "normal"
@@ -121,5 +121,5 @@ export function downloadCombinedMarkdown() {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
-  showToast("Download Started 📥", `Downloading ${filename}`);
+  showToast("Download Started", `Downloading ${filename}`);
 }

@@ -31,7 +31,7 @@ export async function requestNotificationPermission() {
   if (perm === "granted") {
     notificationsEnabled = true;
     updateNotificationUI();
-    showToast("Notifications Enabled! 🔔", "You'll hear a chime and see an alert when a queue completes.");
+    showToast("Notifications Enabled", "You'll hear a chime and see an alert when a queue completes.");
     playCompletionChime();
   } else {
     notificationsEnabled = false;

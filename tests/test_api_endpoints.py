@@ -73,6 +73,32 @@ class TestApiEndpoints(unittest.TestCase):
         for m in expected_models:
             self.assertIn(m, PRICING, f"Model {m} missing from PRICING rate card")
 
+    def test_pricing_endpoint_serves_the_registry_the_costs_use(self):
+        """
+        The Economics rate card is drawn from this. It has to be the same
+        registry the estimates are costed against, or the page shows one set of
+        figures and charges against another.
+        """
+        res = self.client.get("/api/pricing")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+
+        self.assertIn("pricing", data)
+        self.assertIn("default_model", data)
+        self.assertEqual(data["pricing"], PRICING, "must be the live registry, not a copy")
+        self.assertIn(data["default_model"], data["pricing"], "the default has to be a model we price")
+
+        for key, model in data["pricing"].items():
+            for field in ("name", "input_standard", "output_standard", "input_batch", "output_batch", "tier"):
+                self.assertIn(field, model, f"{key} is missing {field}, which the rate card renders")
+
+    def test_every_batch_rate_is_half_the_standard_one(self):
+        """The view promises a 50% discount in its own heading."""
+        pricing = self.client.get("/api/pricing").json()["pricing"]
+        for key, model in pricing.items():
+            self.assertAlmostEqual(model["input_batch"], model["input_standard"] / 2, places=6, msg=key)
+            self.assertAlmostEqual(model["output_batch"], model["output_standard"] / 2, places=6, msg=key)
+
     def test_sync_pricing_endpoint(self):
         """Test /api/sync_pricing endpoint returns structured response with pricing dict.
 

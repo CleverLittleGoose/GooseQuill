@@ -338,6 +338,22 @@ def get_documents(model: str = "gemini-3.1-flash-lite"):
     """List all discoverable folders and PDF files with page counts and detailed token cost estimates."""
     return doc_repository.scan_directory(BASE_ACCOUNTS_DIR, model_name=model)
 
+@app.get("/api/pricing")
+def get_pricing():
+    """
+    The rate card the interface shows.
+
+    The Economics view used to carry these figures as ten rows of hand-written
+    HTML, which meant "Sync Latest Rates" could report success and change
+    nothing the reader could see, and a model added to the registry never
+    appeared at all. Served from the registry, the table cannot disagree with
+    what the estimates are actually costed against.
+    """
+    return {
+        "pricing": PricingRegistry.get_all_raw(),
+        "default_model": PricingRegistry.DEFAULT_MODEL
+    }
+
 @app.post("/api/sync_pricing")
 def sync_pricing():
     """Fetch official Gemini pricing updates from Google AI documentation and update local registry."""

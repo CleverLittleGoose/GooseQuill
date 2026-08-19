@@ -11,6 +11,7 @@ import { initFolderSidebar, renderSidebarFolders, renderStats } from "./js/compo
 import { initDocumentTable, renderDocuments, updateSelectedUI } from "./js/components/document_table.js";
 import { initStudio } from "./js/studio/index.js";
 import { initSearchView } from "./js/components/search_view.js";
+import { initEconomicsView } from "./js/components/economics_view.js";
 import { initCombinerModal, refreshCombinerAvailableFiles } from "./js/combiner/index.js";
 import { initBatchModal, fetchBatchJobs } from "./js/components/batch_modal.js";
 import { initSettingsModal } from "./js/components/settings_modal.js";
@@ -104,6 +105,7 @@ async function init() {
   initStudio();
   watchNavOverflow();
   initSearchView();
+  initEconomicsView();
   initCombinerModal();
   initBatchModal();
   initSettingsModal();

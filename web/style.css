@@ -1315,6 +1315,58 @@ input[type="checkbox"]:focus-visible {
   font-weight: 700;
   color: var(--text-main);
   letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Section headings used to open with a typed emoji, which rendered as whatever
+   the reader's platform felt like and could not take the heading's colour.
+   Drawn, they match every other icon in the app and follow the text. */
+.section-hero-glyph {
+  flex: none;
+  color: var(--primary);
+}
+
+/* Marks a link that leaves the app. Sits on the text baseline rather than
+   after a space, so it cannot wrap onto a line of its own. */
+.link-out-glyph {
+  vertical-align: -1px;
+  margin-left: 4px;
+}
+
+/* Present for a screen reader, absent for everyone else. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The standing state of a panel that is loading or has nothing to show. */
+.view-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 20px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.view-placeholder p {
+  margin: 0;
+  font-size: 14.5px;
+}
+
+.view-placeholder .view-placeholder-glyph {
+  opacity: 0.35;
 }
 
 .economics-grid {

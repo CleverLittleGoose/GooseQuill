@@ -143,6 +143,10 @@ export function initSettingsModal() {
         if (res.pricing) {
           appState.pricing = res.pricing;
           updateModelSpecs(modelSelect ? modelSelect.value : appState.model);
+          // The Economics rate card is drawn from this same registry, so it has
+          // to be redrawn — otherwise the sync reports success over a table
+          // still showing the figures it just replaced.
+          eventBus.emit("pricing:updated");
           eventBus.emit("documents:reload");
         }
         showToast("Pricing Updated", res.message || "Live pricing successfully synchronized from Google AI.");

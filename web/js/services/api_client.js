@@ -48,6 +48,10 @@ class ApiClient {
     return this._request(`/api/documents?model=${encodeURIComponent(model)}`);
   }
 
+  async getPricing() {
+    return this._request("/api/pricing");
+  }
+
   async syncPricing() {
     return this._request("/api/sync_pricing", { method: "POST" });
   }

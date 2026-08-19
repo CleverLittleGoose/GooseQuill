@@ -304,7 +304,7 @@ async function handleUploadFiles(fileList) {
 
   if (uploadedCount > 0) {
     if (uploadModal) uploadModal.style.display = "none";
-    showToast("Upload Successful 🎉", `Uploaded ${uploadedCount} PDF(s) to ${folder}`);
+    showToast("Upload Successful", `Uploaded ${uploadedCount} PDF(s) to ${folder}`);
     appState.recentLogs.push({ text: `[INFO] Uploaded ${uploadedCount} filing(s) to ${folder}`, type: "normal" });
     eventBus.emit("logs:updated");
     eventBus.emit("documents:reload");

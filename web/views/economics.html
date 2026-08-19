@@ -5,7 +5,14 @@
         <div class="standalone-panel">
           <div class="standalone-header">
             <div>
-              <h2 class="section-hero-title">💰 Token Economics & Pricing Transparency</h2>
+              <h2 class="section-hero-title">
+                <svg class="section-hero-glyph" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9"></circle>
+                  <path d="M14.5 9.5a2.5 2.5 0 0 0-2.5-1.5c-1.4 0-2.5.7-2.5 2s1.1 1.7 2.5 2 2.5.7 2.5 2-1.1 2-2.5 2a2.5 2.5 0 0 1-2.5-1.5"></path>
+                  <path d="M12 6.5v11"></path>
+                </svg>
+                Token Economics &amp; Pricing Transparency
+              </h2>
               <p class="text-muted mt-1">Transparent rate cards and live cost calculator based on your exact workspace filings.</p>
             </div>
           </div>
@@ -17,14 +24,20 @@
                 <h3 class="card-title">Official Google Gemini Rate Card</h3>
                 <div class="pricing-actions">
                   <button class="btn btn-outline-night btn-sm" id="econSyncPricingBtn" title="Sync live rates from Google AI Docs">
-                    <span id="econSyncSpinner" class="sync-icon">🔄</span> Sync Latest Rates
+                    <svg id="econSyncSpinner" class="sync-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                      <path d="M23 4v6h-6"></path>
+                      <path d="M1 20v-6h6"></path>
+                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    Sync Latest Rates
                   </button>
                 </div>
               </div>
               <p class="pricing-notice-text mt-1">
-                Rates per 1M tokens in USD. Reference: <a href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank" rel="noopener noreferrer">Google AI Pricing Documentation ↗</a> (check for current tier updates).
+                Rates per 1M tokens in USD. Reference: <a href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank" rel="noopener noreferrer">Google AI Pricing Documentation<svg class="link-out-glyph" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path></svg><span class="sr-only"> (opens in a new tab)</span></a> (check for current tier updates).
               </p>
               <table class="pricing-table mt-2">
+                <caption class="sr-only">Google Gemini token prices per million tokens, in US dollars</caption>
                 <thead>
                   <tr>
                     <th>Model</th>
@@ -34,66 +47,7 @@
                   </tr>
                 </thead>
                 <tbody id="rateCardTableBody">
-                  <tr class="highlight-row">
-                    <td><strong>Gemini 3.1 Flash-Lite</strong> <span class="badge-tag default">Default</span></td>
-                    <td>$0.25 / M tokens</td>
-                    <td>$1.50 / M tokens</td>
-                    <td><strong class="text-night">$0.125 / $0.75</strong></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Gemini 3.5 Flash-Lite</strong> <span class="badge-tag">Economy</span></td>
-                    <td>$0.30 / M tokens</td>
-                    <td>$2.50 / M tokens</td>
-                    <td><strong class="text-night">$0.15 / $1.25</strong></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Gemini 3.7 Flash</strong> <span class="badge-tag frontier">Frontier</span></td>
-                    <td>$0.75 / M tokens</td>
-                    <td>$3.75 / M tokens</td>
-                    <td><strong class="text-night">$0.375 / $1.875</strong></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Gemini 3.6 Flash</strong></td>
-                    <td>$0.75 / M tokens</td>
-                    <td>$3.75 / M tokens</td>
-                    <td><strong class="text-night">$0.375 / $1.875</strong></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Gemini 3.5 Flash</strong></td>
-                    <td>$1.50 / M tokens</td>
-                    <td>$9.00 / M tokens</td>
-                    <td><strong class="text-night">$0.75 / $4.50</strong></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Gemini 3 Flash Preview</strong></td>
-                    <td>$0.50 / M tokens</td>
-                    <td>$3.00 / M tokens</td>
-                    <td><strong class="text-night">$0.25 / $1.50</strong></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Gemini 3.1 Pro Preview</strong> <span class="badge-tag pro">Pro</span></td>
-                    <td>$2.00 / M tokens</td>
-                    <td>$12.00 / M tokens</td>
-                    <td><strong class="text-night">$1.00 / $6.00</strong></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Gemini 2.5 Pro</strong> <span class="badge-tag pro">Pro</span></td>
-                    <td>$1.25 / M tokens</td>
-                    <td>$10.00 / M tokens</td>
-                    <td><strong class="text-night">$0.625 / $5.00</strong></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Gemini 2.5 Flash</strong></td>
-                    <td>$0.30 / M tokens</td>
-                    <td>$2.50 / M tokens</td>
-                    <td><strong class="text-night">$0.15 / $1.25</strong></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Gemini 2.5 Flash-Lite</strong></td>
-                    <td>$0.10 / M tokens</td>
-                    <td>$0.40 / M tokens</td>
-                    <td><strong class="text-night">$0.05 / $0.20</strong></td>
-                  </tr>
+                  <tr><td colspan="4" class="text-muted text-center" style="padding: 28px;">Loading the current rate card…</td></tr>
                 </tbody>
               </table>
             </div>

@@ -34,6 +34,8 @@ export const appState = {
   recentLogs: [],
   jobErrors: [],
   pricing: {},
+  // Which model the server treats as the default, so the rate card can mark it.
+  defaultModel: "",
   stats: {},
   // Workspace UI filter states
   currentView: "workspace", // "workspace" | "studio" | "search" | "combiner" | "batches" | "economics"
