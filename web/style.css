@@ -2305,6 +2305,62 @@ input[type="checkbox"]:focus-visible {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  flex: 1;
+}
+
+/* --------------------------------------------------------------------------
+   Studio toolbar grouping
+
+   The toolbar is a dozen controls that do quite different things: two change
+   what you are reading, three open or close a pane, four act on the file. Flat
+   and evenly spaced, they read as one undifferentiated row and you have to
+   recall which is which. Grouping them costs nothing and does most of the work
+   a label would.
+   -------------------------------------------------------------------------- */
+.studio-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.studio-toolbar-sep {
+  width: 1px;
+  align-self: stretch;
+  min-height: 22px;
+  background: var(--border-subtle);
+  margin: 0 2px;
+}
+
+/*
+ * Pushes the file actions away from the view controls when the row has the
+ * width for it. A spacer element did this too, but as a flex item it claimed a
+ * whole line of its own the moment the toolbar wrapped, costing a row of
+ * vertical space on a 13" screen for nothing.
+ */
+.studio-toolbar-actions {
+  margin-left: auto;
+}
+
+/* Empty until Compare is on; it must not hold a gap open in the meantime. */
+.studio-diff-group:empty,
+.studio-diff-group:not(:has(> *:not([style*="display: none"]))) {
+  display: none;
+}
+
+/*
+ * The diff mode control states what is being compared rather than offering a
+ * choice between two things named in the abstract, because "Markdown" and
+ * "Words" only mean something once you can see which one you are looking at.
+ */
+.diff-mode-btn {
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+  border-style: dashed;
+}
+
+.diff-mode-btn::before {
+  content: "vs ";
+  color: var(--text-muted);
 }
 
 .studio-workspace-body {
@@ -3016,4 +3072,261 @@ body.is-resizing-panes .studio-pane {
 .studio-doc-tab-close:hover {
   background: rgba(239, 68, 68, 0.22);
   color: #fca5a5;
+}
+
+/* ==========================================================================
+   DOCUMENT SWITCHER (Cmd+P)
+
+   Reaching a filing meant going back to the Workspace, finding the entity in
+   the sidebar, then the year in the table. This is the same journey in three
+   keystrokes.
+   ========================================================================== */
+.doc-switcher-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  background: rgba(3, 6, 12, 0.72);
+  backdrop-filter: blur(3px);
+}
+
+.doc-switcher {
+  width: min(680px, 92vw);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-dock);
+  overflow: hidden;
+}
+
+.doc-switcher-input {
+  width: 100%;
+  padding: 16px 18px;
+  font-family: inherit;
+  font-size: 17px;
+  color: var(--text-main);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.doc-switcher-input::placeholder {
+  color: var(--text-muted);
+}
+
+.doc-switcher-input:focus {
+  outline: none;
+}
+
+.doc-switcher-list {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  padding: 6px;
+}
+
+.doc-switcher-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.doc-switcher-item:hover {
+  background: var(--bg-surface-hover);
+}
+
+.doc-switcher-item.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+.doc-switcher-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-switcher-folder {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.doc-switcher-item.active .doc-switcher-folder {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.doc-switcher-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.doc-switcher-hint {
+  display: flex;
+  gap: 18px;
+  padding: 9px 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-app);
+}
+
+.doc-switcher-hint kbd {
+  display: inline-block;
+  min-width: 18px;
+  margin-right: 3px;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: center;
+  color: var(--text-secondary);
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);
+}
+
+/* ==========================================================================
+   TOP NAVIGATION FIT
+
+   At 1280px — a 13" MacBook, the most common screen this will ever run on —
+   the tab strip needed 824px and had 383px. It scrolls, and its scrollbar is
+   hidden, so "Batches" and "Costs" were simply not there as far as anyone
+   could tell: two top-level views reachable only by a horizontal scroll
+   gesture over a bar that gives no sign it scrolls.
+
+   Three things were taking the room: verbose labels, generous padding, and a
+   status pill spelling out the full model id in a monospace face. None of them
+   was worth a navigation item.
+   ========================================================================== */
+
+.nav-left {
+  gap: 20px;
+}
+
+.studio-tab-btn {
+  padding: 8px 11px;
+  gap: 7px;
+}
+
+/* The model id is reference information, not navigation. It stays readable at
+   a glance and stays complete in the tooltip and in Settings. */
+.status-pill {
+  min-width: 0;
+  max-width: 168px;
+  overflow: hidden;
+}
+
+.status-pill > span:not(.pulse-dot) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * If it still does not fit, say so. A hidden scrollbar on a nav bar hides the
+ * fact that there is more nav; this fades the edge that has more behind it.
+ */
+.studio-nav {
+  position: relative;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+}
+
+/* Only fade when there is genuinely something past the edge. */
+.studio-nav:not([data-overflowing="true"]) {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+@media (max-width: 1180px) {
+  /* The wordmark is the first thing to go: the logo still identifies the app,
+     and a navigation item you cannot reach costs more than a name you can. */
+  .brand-text {
+    display: none;
+  }
+
+  .top-nav {
+    padding: 0 14px;
+  }
+
+  .nav-left {
+    gap: 12px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .status-pill {
+    max-width: 44px;
+    padding: 7px 12px;
+  }
+}
+
+/* ==========================================================================
+   DOCUMENT TABLE FIT
+
+   The fixed columns (checkbox, year, size, status, action) come to 560px
+   before padding. The filing name then took whatever its longest entry needed
+   — around 300px — and the table overflowed its container by 167px at 1280px
+   wide, quietly clipping Status and the action button behind a scrollbar the
+   container never showed.
+
+   The name is the one column that can give: it is the only cell whose full
+   value is already in a `title`, and the entity underneath it repeats what the
+   sidebar says. So it takes the remaining width and ellipsises inside it.
+   `max-width: 0` is the usual trick for this — it stops the cell claiming its
+   content's intrinsic width, leaving `width` to distribute what is left.
+   ========================================================================== */
+.documents-table .doc-name-col {
+  max-width: 0;
+  width: 100%;
+}
+
+.doc-name-cell {
+  min-width: 0;
+}
+
+.doc-name-cell > div {
+  min-width: 0;
+}
+
+.doc-name-text,
+.doc-entity-tag {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* "214 pgs • 12646 KB" wrapped to three lines and dragged every row taller. */
+.documents-table .doc-size-col {
+  white-space: nowrap;
+}
+
+@media (max-width: 1400px) {
+  .documents-table th,
+  .documents-table td {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
+
+/* Says when the consolidated preview is showing only the opening pages. */
+.combiner-preview-notice {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--accent-amber);
+  background: rgba(245, 158, 11, 0.1);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.25);
 }

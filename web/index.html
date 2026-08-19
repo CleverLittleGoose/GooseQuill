@@ -60,14 +60,14 @@
               <line x1="8" y1="12" x2="16" y2="12"></line>
               <line x1="12" y1="8" x2="12" y2="16"></line>
             </svg>
-            <span>Markdown Combiner</span>
+            <span>Combine</span>
             <span class="tab-badge" id="topNavConvertedBadge" style="display: none;">0</span>
           </button>
           <button class="studio-tab-btn" id="tabNavBatches" data-view="batches">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
             </svg>
-            <span>Overnight Batches</span>
+            <span>Batches</span>
             <span class="tab-badge night" id="topNavBatchActiveBadge" style="display: none;">0</span>
           </button>
           <button class="studio-tab-btn" id="tabNavEconomics" data-view="economics">
@@ -75,7 +75,7 @@
               <line x1="12" y1="1" x2="12" y2="23"></line>
               <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
             </svg>
-            <span>Economics</span>
+            <span>Costs</span>
           </button>
         </nav>
       </div>
@@ -306,9 +306,9 @@
                     <th style="width: 40px; text-align: center;">
                       <input type="checkbox" id="masterTableCheckbox" class="doc-chk" title="Toggle all in current filter">
                     </th>
-                    <th>Document / Filing Name</th>
+                    <th class="doc-name-col">Document / Filing Name</th>
                     <th style="width: 110px;">Period / Year</th>
-                    <th style="width: 130px;">Pages & Size</th>
+                    <th class="doc-size-col" style="width: 130px;">Pages &amp; Size</th>
                     <th style="width: 140px;">Status</th>
                     <th style="width: 140px; text-align: right;">Action</th>
                   </tr>
@@ -493,6 +493,7 @@
 
             <!-- Live Preview Body Area -->
             <div class="combiner-preview-body">
+              <div class="combiner-preview-notice" id="studioCombinerPreviewNotice" role="status" style="display: none;"></div>
               <div class="combiner-view-panel active" id="studioCombinerTabRendered">
                 <div class="markdown-preview prose" id="studioCombinerRenderedContent">
                   <div class="text-muted text-center" style="padding: 60px;">Select converted documents on the left to preview consolidated markdown.</div>
@@ -713,27 +714,46 @@
                 <span class="text-xs text-muted" id="studioDocMeta">Pages • Size</span>
               </div>
             </div>
+            <!--
+              Grouped rather than flat. Twelve controls of identical weight in
+              one row gave no clue which of them changed what you were reading,
+              which turned something on beside it, or which wrote to disk.
+            -->
             <div class="studio-header-actions">
-              <div class="btn-group" role="group" aria-label="Format toggle">
-                <button class="btn btn-sm btn-secondary active" id="studioFormatRenderedBtn" title="Rendered HTML View">👁️ Rendered</button>
-                <button class="btn btn-sm btn-secondary" id="studioFormatRawBtn" title="Raw Markdown Code">&lt; &gt; Raw</button>
+              <div class="studio-toolbar-group" role="group" aria-label="What to show">
+                <div class="btn-group">
+                  <button class="btn btn-sm btn-secondary active" id="studioFormatRenderedBtn" title="Read the transcript as formatted text">Rendered</button>
+                  <button class="btn btn-sm btn-secondary" id="studioFormatRawBtn" title="Read and edit the Markdown behind it">Markdown</button>
+                </div>
+                <div class="btn-group">
+                  <button class="btn btn-sm btn-secondary active" id="studioScopeAllBtn" title="Show the whole document">Whole doc</button>
+                  <button class="btn btn-sm btn-secondary" id="studioScopePageBtn" title="Show only the page on screen">This page</button>
+                </div>
               </div>
-              <div class="btn-group" role="group" aria-label="Scope toggle">
-                <button class="btn btn-sm btn-secondary active" id="studioScopeAllBtn" title="Full Document">📜 Full Doc</button>
-                <button class="btn btn-sm btn-secondary" id="studioScopePageBtn" title="Current Page Only">📄 Page Only</button>
+
+              <div class="studio-toolbar-sep" aria-hidden="true"></div>
+
+              <div class="studio-toolbar-group" role="group" aria-label="Panes">
+                <button class="btn btn-sm btn-secondary active" id="studioTogglePdfBtn" title="Show or hide the scanned page">🖼️ Scan</button>
+                <button class="btn btn-sm btn-secondary" id="studioCompareBtn" title="Open a second document beside this one">⇔ Compare</button>
+                <button class="btn btn-sm btn-secondary active" id="studioAutoScrollBtn" title="Keep the scan in step with the transcript as you scroll">⚡ Sync</button>
               </div>
-              <button class="btn btn-sm btn-secondary" id="studioCompareBtn" title="Open a second document beside this one">⇔ Compare</button>
-              <button class="btn btn-sm btn-secondary active" id="studioLinkPagesBtn" title="Keep both documents on the same page number" style="display: none;">🔗 Link</button>
-              <button class="btn btn-sm btn-secondary" id="studioDiffBtn" title="Highlight what changed between the two documents" style="display: none;">± Diff</button>
-              <span class="diff-summary" id="studioDiffSummary" style="display: none;"></span>
-              <button class="btn btn-sm btn-secondary btn-icon-label" id="studioDiffPrevBtn" title="Previous changed page" aria-label="Previous changed page" style="display: none;">&uarr;</button>
-              <button class="btn btn-sm btn-secondary btn-icon-label" id="studioDiffNextBtn" title="Next changed page" aria-label="Next changed page" style="display: none;">&darr;</button>
-              <button class="btn btn-sm btn-secondary active" id="studioAutoScrollBtn" title="Keep the scan in step with the transcript as you scroll">⚡ Sync</button>
-              <button class="btn btn-sm btn-secondary" id="studioSearchToggleBtn" title="Find in document (Cmd+F / Ctrl+F)">🔍 Find</button>
-              <button class="btn btn-sm btn-secondary active" id="studioTogglePdfBtn" title="Show or hide the scanned page">🖼️ Scan</button>
-              <button class="btn btn-sm btn-secondary" id="studioSaveBtn" title="Save edits to the .md file on disk" style="display: none;">💾 Save</button>
-              <button class="btn btn-sm btn-secondary btn-icon-label" id="studioCopyBtn" title="Copy the markdown to the clipboard" aria-label="Copy markdown">⧉</button>
-              <button class="btn btn-sm btn-primary btn-icon-label" id="studioDownloadBtn" title="Download the markdown file" aria-label="Download markdown">⬇</button>
+
+              <div class="studio-toolbar-group studio-diff-group" role="group" aria-label="Changes">
+                <button class="btn btn-sm btn-secondary active" id="studioLinkPagesBtn" title="Keep both documents on the same page number" style="display: none;">🔗 Link</button>
+                <button class="btn btn-sm btn-secondary" id="studioDiffBtn" title="Highlight what changed between the two documents" style="display: none;">± Diff</button>
+                <button class="btn btn-sm btn-secondary diff-mode-btn" id="studioDiffModeBtn" title="Comparing the Markdown as written — structural edits show up. Click to compare the words instead." style="display: none;">Markdown</button>
+                <span class="diff-summary" id="studioDiffSummary" style="display: none;"></span>
+                <button class="btn btn-sm btn-secondary btn-icon-label" id="studioDiffPrevBtn" title="Previous changed page (p)" aria-label="Previous changed page" aria-keyshortcuts="p" style="display: none;">&uarr;</button>
+                <button class="btn btn-sm btn-secondary btn-icon-label" id="studioDiffNextBtn" title="Next changed page (n)" aria-label="Next changed page" aria-keyshortcuts="n" style="display: none;">&darr;</button>
+              </div>
+
+              <div class="studio-toolbar-group studio-toolbar-actions" role="group" aria-label="Document actions">
+                <button class="btn btn-sm btn-secondary" id="studioSearchToggleBtn" title="Find in this document (Cmd+F)" aria-keyshortcuts="Meta+F Control+F">🔍 Find</button>
+                <button class="btn btn-sm btn-secondary" id="studioSaveBtn" title="Save edits to the .md file on disk" style="display: none;">💾 Save</button>
+                <button class="btn btn-sm btn-secondary btn-icon-label" id="studioCopyBtn" title="Copy the markdown to the clipboard" aria-label="Copy markdown">⧉</button>
+                <button class="btn btn-sm btn-secondary btn-icon-label" id="studioDownloadBtn" title="Download the markdown file" aria-label="Download markdown">⬇</button>
+              </div>
             </div>
           </div>
 
@@ -856,99 +876,6 @@
           <h4>Drag and drop PDF filings here</h4>
           <p class="text-muted text-sm mt-1">or <strong style="color: var(--primary-color);">browse files from your computer</strong></p>
           <input type="file" id="fileInput" accept=".pdf" multiple style="display: none;">
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ========================================== -->
-  <!-- MODAL: DOCUMENT VIEWER (SPLIT VIEW)        -->
-  <!-- ========================================== -->
-  <div class="modal-backdrop" id="viewerModal" style="display: none;">
-    <div class="modal-dialog modal-fullscreen">
-      <div class="modal-header">
-        <div class="modal-title-group">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-          </svg>
-          <div>
-            <h3 id="viewerDocTitle">Document Name</h3>
-            <span class="text-xs text-muted" id="viewerDocMeta">Pages • Size</span>
-          </div>
-        </div>
-        <div class="modal-header-actions">
-          <div class="btn-group" role="group" aria-label="Format toggle">
-            <button class="btn btn-sm btn-secondary active" id="viewerFormatRenderedBtn" title="Rendered HTML View">👁️ Rendered</button>
-            <button class="btn btn-sm btn-secondary" id="viewerFormatRawBtn" title="Raw Markdown Code">&lt; &gt; Raw</button>
-          </div>
-          <div class="btn-group" role="group" aria-label="Scope toggle">
-            <button class="btn btn-sm btn-secondary active" id="viewerScopeAllBtn" title="Full Document">📜 Full Doc</button>
-            <button class="btn btn-sm btn-secondary" id="viewerScopePageBtn" title="Current Page Only">📄 Page Only</button>
-          </div>
-          <button class="btn btn-sm btn-secondary active" id="viewerAutoScrollBtn" title="Synchronize scrolling between Markdown and PDF preview">⚡ Auto-Sync</button>
-          <button class="btn btn-sm btn-secondary" id="viewerSearchToggleBtn" title="Search in document (Cmd+F / Ctrl+F)" aria-label="Open text search" aria-keyshortcuts="Control+F Meta+F">🔍 Search</button>
-          <button class="btn btn-sm btn-secondary" id="viewerTogglePdfBtn">Hide PDF Split</button>
-          <button class="btn btn-sm btn-secondary" id="viewerExpandStudioBtn" title="Open in Full Document Studio Workspace">⛶ Studio View</button>
-          <button class="btn btn-sm btn-secondary" id="viewerSaveBtn" title="Save edits to the .md file on disk" style="display: none;">💾 Save</button>
-          <button class="btn btn-sm btn-secondary" id="viewerCopyBtn">Copy Markdown</button>
-          <button class="btn btn-sm btn-primary" id="viewerDownloadBtn">Download .md</button>
-          <button class="btn-close" id="closeViewerBtn">&times;</button>
-        </div>
-      </div>
-      <div class="modal-body viewer-body">
-        <div class="viewer-split-container" id="viewerSplitContainer">
-          <div class="viewer-pane markdown-pane" id="viewerMarkdownPane">
-            <!-- Accessible In-Viewer Search Toolbar -->
-            <div class="viewer-search-bar" id="viewerSearchBar" role="search" aria-label="Document text search" style="display: none;">
-              <div class="viewer-search-input-group">
-                <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-                <input
-                  type="search"
-                  id="viewerSearchInput"
-                  class="form-input search-input"
-                  placeholder="Find in document... (Enter ↵ / Shift+↵)"
-                  autocomplete="off"
-                  spellcheck="false"
-                  aria-label="Find in document"
-                  aria-describedby="viewerSearchCount"
-                />
-                <button class="search-case-btn" id="viewerSearchCaseBtn" title="Match Case" aria-label="Toggle case sensitivity" aria-pressed="false">Aa</button>
-              </div>
-              <div class="viewer-search-controls">
-                <span class="search-count" id="viewerSearchCount" role="status" aria-live="polite">0/0</span>
-                <button class="btn btn-icon btn-xs" id="viewerSearchPrevBtn" title="Previous match (Shift+Enter)" aria-label="Previous match" disabled>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg>
-                </button>
-                <button class="btn btn-icon btn-xs" id="viewerSearchNextBtn" title="Next match (Enter)" aria-label="Next match" disabled>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                </button>
-                <button class="btn btn-icon btn-xs close-search-btn" id="viewerSearchCloseBtn" title="Close search (Esc)" aria-label="Close search">
-                  &times;
-                </button>
-              </div>
-            </div>
-            <!-- Rendered Markdown View -->
-            <div class="markdown-preview prose" id="viewerMarkdownContent"></div>
-
-            <!-- Raw Markdown View -->
-            <div class="raw-editor-wrapper" id="viewerRawMarkdownWrapper" style="display: none; height: 100%;">
-              <textarea id="viewerRawMarkdownTextarea" class="code-editor" spellcheck="false" placeholder="Raw markdown content..."></textarea>
-            </div>
-          </div>
-          <div class="viewer-pane pdf-pane" id="viewerPdfPane">
-            <div class="pdf-controls-bar">
-              <button class="btn btn-xs btn-secondary" id="pdfPrevPageBtn">&larr; Prev</button>
-              <span class="text-xs" id="pdfPageIndicator">Page 1 of 1</span>
-              <button class="btn btn-xs btn-secondary" id="pdfNextPageBtn">Next &rarr;</button>
-            </div>
-            <div class="pdf-render-canvas-wrapper" id="pdfCanvasWrapper">
-              <img id="pdfPageImage" class="pdf-page-image" alt="PDF Page Preview">
-            </div>
-          </div>
         </div>
       </div>
     </div>

@@ -81,6 +81,34 @@ export function initHeader() {
   eventBus.on("view:switch", (viewName) => switchStudioView(viewName));
 }
 
+/**
+ * Tell the tab strip whether it has anything hidden past its edges.
+ *
+ * The strip scrolls with its scrollbar hidden, so without this a view that did
+ * not fit was indistinguishable from a view that did not exist. The CSS fades
+ * the edge only while this says there is something behind it.
+ */
+export function watchNavOverflow() {
+  const nav = document.querySelector(".studio-nav");
+  if (!nav) return;
+
+  const update = () => {
+    const overflowing = String(nav.scrollWidth - nav.clientWidth > 1);
+    // Only write on a real change. This element is watched for mutations, and
+    // an unconditional write is a mutation — which re-enters the observer and
+    // spins forever.
+    if (nav.dataset.overflowing !== overflowing) nav.dataset.overflowing = overflowing;
+  };
+
+  update();
+  nav.addEventListener("scroll", update, { passive: true });
+  new ResizeObserver(update).observe(nav);
+  // Opening a document shows a tab that was display:none, which changes the
+  // strip's width without resizing the strip itself. Attributes are deliberately
+  // not watched: the update writes one, and watching it would loop.
+  new MutationObserver(update).observe(nav, { childList: true, subtree: true });
+}
+
 export function switchStudioView(viewName) {
   appState.currentView = viewName;
 

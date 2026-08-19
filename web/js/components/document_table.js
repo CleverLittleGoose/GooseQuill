@@ -348,7 +348,7 @@ export function renderDocuments() {
       <td style="text-align: center;">
         <input type="checkbox" class="doc-checkbox doc-chk" ${isSelected ? "checked" : ""}>
       </td>
-      <td>
+      <td class="doc-name-col">
         <div class="doc-name-cell">
           <svg class="doc-filing-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -361,7 +361,7 @@ export function renderDocuments() {
         </div>
       </td>
       <td>${yearBadge}</td>
-      <td>
+      <td class="doc-size-col">
         <strong style="color: var(--text-main);">${doc.total_pages}</strong> pgs <span class="text-muted">• ${sizeKb} KB</span>
       </td>
       <td>${statusBadge}</td>
