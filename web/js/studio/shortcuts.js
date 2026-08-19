@@ -5,7 +5,7 @@
  * while reading a filing, bound to the keys the rest of the desktop uses for
  * them.
  *
- *   Cmd/Ctrl+P          open a document
+ *   Cmd/Ctrl+K          open a document
  *   Cmd/Ctrl+Shift+F    search the whole workspace
  *   Cmd/Ctrl+F          find in this document
  *   [ / ]               previous / next open document
@@ -33,7 +33,12 @@ export function initStudioShortcuts() {
 
     // The document switcher works from anywhere — it is how you get to a
     // document, so requiring you to already be looking at one is backwards.
-    if (mod && !event.shiftKey && event.key.toLowerCase() === "p") {
+    //
+    // Cmd+K rather than Cmd+P: Cmd+P is Print, and taking it from someone who
+    // meant to print the page they are reading is exactly the kind of override
+    // that makes an app feel hostile. Cmd+K is what the web has settled on for
+    // a site's own search and command palette.
+    if (mod && !event.shiftKey && event.key.toLowerCase() === "k") {
       event.preventDefault();
       openDocumentSwitcher();
       return;

@@ -1,5 +1,5 @@
 /**
- * GooseQuill — Document Switcher (Cmd+P)
+ * GooseQuill — Document Switcher (Cmd+K)
  *
  * Type a few letters, get the document. Reaching a filing previously meant
  * going back to the Workspace, finding the right entity in the sidebar, then
@@ -53,7 +53,8 @@ function build() {
   overlay.innerHTML = `
     <div class="doc-switcher">
       <input class="doc-switcher-input" type="text" placeholder="Go to document…"
-             autocomplete="off" spellcheck="false" aria-controls="docSwitcherList">
+             autocomplete="off" spellcheck="false" role="combobox" aria-expanded="true"
+             aria-autocomplete="list" aria-controls="docSwitcherList">
       <ul class="doc-switcher-list" id="docSwitcherList" role="listbox"></ul>
       <div class="doc-switcher-hint">
         <span><kbd>↑</kbd><kbd>↓</kbd> to move</span>
@@ -134,14 +135,17 @@ function draw() {
   if (results.length === 0) {
     const empty = document.createElement("li");
     empty.className = "doc-switcher-empty";
+    empty.setAttribute("role", "status");
     empty.textContent = "No converted document matches that.";
     list.appendChild(empty);
+    input.removeAttribute("aria-activedescendant");
     return;
   }
 
   results.forEach((doc, index) => {
     const item = document.createElement("li");
     item.className = `doc-switcher-item ${index === activeIndex ? "active" : ""}`;
+    item.id = `docSwitcherOption${index}`;
     item.setAttribute("role", "option");
     item.setAttribute("aria-selected", String(index === activeIndex));
 
@@ -157,6 +161,10 @@ function draw() {
     item.addEventListener("click", () => choose(index));
     list.appendChild(item);
   });
+
+  // Focus stays in the input while the arrows move a highlight in the list, so
+  // without this a screen reader announces nothing as you walk the results.
+  input.setAttribute("aria-activedescendant", `docSwitcherOption${activeIndex}`);
 }
 
 function move(delta) {
