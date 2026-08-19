@@ -54,6 +54,14 @@ export const searchState = {
   isOpen: false,
   query: "",
   matchCase: false,
+  /**
+   * Which pane is being searched: "A" or "B".
+   *
+   * Find only ever looked at pane A, so with two documents open half of what
+   * was on screen was unsearchable.
+   */
+  pane: "A",
+
   /** {start, end} offsets — raw editor mode only. */
   rawMatches: [],
   currentIndex: -1,

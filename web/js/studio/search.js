@@ -14,6 +14,52 @@ import * as dom from "./dom.js";
 import { updatePdfPageView } from "./page_view.js";
 import { updateActiveItem } from "./outline.js";
 
+/**
+ * The transcript being searched.
+ *
+ * Pane B has its own TranscriptView with its own index and its own hits, so
+ * searching it is a matter of pointing at the right one rather than teaching
+ * search about two documents.
+ */
+function activeView() {
+  if (searchState.pane === "B") return studio.comparePane?.transcript || null;
+  return studio.transcript;
+}
+
+/** Pane B only exists while Compare is on. */
+function canSearchPaneB() {
+  return Boolean(studio.compareEnabled && studio.comparePane && studio.comparePane.doc);
+}
+
+/** Show the A/B picker only when there is a choice, and reflect the current one. */
+export function updateSearchPanePicker() {
+  const picker = dom.searchPanePicker();
+  const available = canSearchPaneB();
+
+  if (!available && searchState.pane === "B") setSearchPane("A");
+  if (picker) picker.style.display = available ? "inline-flex" : "none";
+
+  dom.searchPaneButtons().forEach((btn) => {
+    const isActive = btn.dataset.pane === searchState.pane;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-pressed", String(isActive));
+  });
+}
+
+export function setSearchPane(pane) {
+  if (pane === "B" && !canSearchPaneB()) return;
+  if (searchState.pane === pane) return;
+
+  // Hits belong to the document they were found in; clear before moving.
+  studio.transcript?.clearSearch();
+  studio.comparePane?.transcript?.clearSearch();
+
+  searchState.pane = pane;
+  updateSearchPanePicker();
+
+  if (searchState.query) performSearch(searchState.query, searchState.matchCase);
+}
+
 function setCount(text) {
   const el = dom.searchCount();
   if (el) el.textContent = text;
@@ -25,6 +71,7 @@ function setNavEnabled(enabled) {
 
 export function openSearchBar() {
   searchState.isOpen = true;
+  updateSearchPanePicker();
 
   const bar = dom.searchBar();
   const input = dom.searchInput();
@@ -50,7 +97,8 @@ export function closeSearchBar() {
   setCount("0/0");
   setNavEnabled(false);
 
-  if (studio.transcript) studio.transcript.clearSearch();
+  studio.transcript?.clearSearch();
+  studio.comparePane?.transcript?.clearSearch();
   clearStraySearchHighlights();
 }
 
@@ -86,12 +134,13 @@ export function handleSearchKeydown(event) {
 export function performSearch(query, matchCase = false) {
   searchState.query = (query || "").trim();
 
-  if (studio.format === "raw") {
+  // The raw editor is pane A's Markdown; there is no textarea for pane B.
+  if (studio.format === "raw" && searchState.pane === "A") {
     performRawSearch(searchState.query, matchCase, dom.rawTextarea());
     return;
   }
 
-  const view = studio.transcript;
+  const view = activeView();
   if (!view) return;
 
   if (!searchState.query) {
@@ -118,14 +167,14 @@ export function performSearch(query, matchCase = false) {
 }
 
 export function navigateMatch(direction = 1) {
-  if (studio.format === "raw") {
+  if (studio.format === "raw" && searchState.pane === "A") {
     const count = searchState.rawMatches.length;
     if (count === 0) return;
     activateRawMatch((searchState.currentIndex + direction + count) % count);
     return;
   }
 
-  const view = studio.transcript;
+  const view = activeView();
   if (!view || view.searchHits.length === 0) return;
   view.nextHit(direction);
   syncCountFromView(view);
@@ -135,8 +184,16 @@ export function navigateMatch(direction = 1) {
 function syncCountFromView(view) {
   setCount(`${view.currentHitIndex + 1} of ${view.searchHits.length}`);
 
+  // Only pane A drives the shared page state; a hit in B moves B alone.
   const page = view.getCurrentHitPage();
-  if (page && page !== appState.currentPdfPage && page >= 1 && page <= appState.totalPdfPages) {
+  if (!page) return;
+
+  if (searchState.pane === "B") {
+    studio.comparePane?.goToPage(page);
+    return;
+  }
+
+  if (page !== appState.currentPdfPage && page >= 1 && page <= appState.totalPdfPages) {
     appState.currentPdfPage = page;
     updatePdfPageView();
     updateActiveItem();
@@ -230,13 +287,14 @@ function measureTextareaOffsetTop(textarea, index) {
 
 /** Belt and braces: strip any stray marks left in the rendered container. */
 function clearStraySearchHighlights() {
-  const container = dom.markdownContent();
-  if (!container) return;
-  container.querySelectorAll("mark.viewer-search-match").forEach((mark) => {
-    const parent = mark.parentNode;
-    if (!parent) return;
-    parent.replaceChild(document.createTextNode(mark.textContent), mark);
-    parent.normalize();
+  [dom.markdownContent(), dom.comparePaneHost()].forEach((container) => {
+    if (!container) return;
+    container.querySelectorAll("mark.viewer-search-match").forEach((mark) => {
+      const parent = mark.parentNode;
+      if (!parent) return;
+      parent.replaceChild(document.createTextNode(mark.textContent), mark);
+      parent.normalize();
+    });
   });
 }
 
