@@ -138,7 +138,10 @@ function renderIdle(results, summary) {
   if (summary) summary.textContent = "";
   results.innerHTML = `
     <div class="search-empty">
-      <div class="search-empty-icon">🔎</div>
+      <svg class="search-empty-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"></circle>
+        <path d="M20 20l-3.8-3.8"></path>
+      </svg>
       <div class="search-empty-title">Search every converted document</div>
       <p class="text-muted text-sm">Type a phrase to find it across the whole workspace. Results show the page it appears on, and open the document there.</p>
     </div>
@@ -157,7 +160,11 @@ function renderResults(data, container, summary, { append = false } = {}) {
   if (!results.length && !append) {
     container.innerHTML = `
       <div class="search-empty">
-        <div class="search-empty-icon">∅</div>
+        <svg class="search-empty-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="M20 20l-3.8-3.8"></path>
+          <path d="M8.7 8.7l4.6 4.6M13.3 8.7l-4.6 4.6"></path>
+        </svg>
         <div class="search-empty-title">Nothing found for “${escapeHtml(data.query)}”</div>
         <p class="text-muted text-sm">Try a shorter phrase, or turn off whole-word matching.</p>
       </div>

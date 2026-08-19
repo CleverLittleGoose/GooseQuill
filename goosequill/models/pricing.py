@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+from datetime import datetime, timezone
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -168,6 +169,17 @@ class PricingRegistry:
     }
 
     MODELS: Dict[str, ModelPricing] = dict(BASE_MODELS)
+
+    # When the rates above were last fetched from Google, as an ISO-8601 UTC
+    # string. ``None`` means nobody has ever synced, and the figures are the
+    # ones bundled with this release.
+    #
+    # That distinction is the whole point of recording it. Without it a rate
+    # card that has never been synced looks exactly like one synced this
+    # morning, and the reader has no way to tell a current figure from one
+    # frozen at whenever the release was cut.
+    synced_at: Optional[str] = None
+
     DEFAULT_MODEL = "gemini-3.1-flash-lite"
     PRICING_DOC_URL = "https://ai.google.dev/gemini-api/docs/pricing"
     PRICING_RAW_URL = "https://ai.google.dev/gemini-api/docs/pricing.md.txt"
@@ -186,25 +198,59 @@ class PricingRegistry:
 
     @classmethod
     def load_overrides(cls, cache_file: Path):
-        """Load cached pricing overrides if available."""
+        """Load cached pricing overrides, and when they were fetched."""
         if not cache_file.exists():
             return
         try:
             with open(cache_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                for k, v in data.items():
-                    if isinstance(v, dict) and "input_standard" in v:
-                        cls.MODELS[k] = ModelPricing(**v)
+
+            models, synced_at = cls._unpack_cache(data)
+            loaded = 0
+            for k, v in models.items():
+                if isinstance(v, dict) and "input_standard" in v:
+                    cls.MODELS[k] = ModelPricing(**v)
+                    loaded += 1
+
+            # A cache written before the sync time was recorded carries none,
+            # and reporting that as ``None`` would tell the reader these rates
+            # had never been synced when in fact they had — the exact confusion
+            # the field exists to remove. The file's own mtime is when it was
+            # written, which is when the sync happened. The next sync replaces
+            # this with the real thing.
+            if synced_at is None and loaded:
+                synced_at = datetime.fromtimestamp(
+                    cache_file.stat().st_mtime, tz=timezone.utc
+                ).isoformat(timespec="seconds")
+
+            cls.synced_at = synced_at
+
             logger.info(f"Loaded pricing overrides from {cache_file}")
         except Exception as e:
             logger.warning(f"Failed to load pricing overrides from {cache_file}: {e}")
 
+    @staticmethod
+    def _unpack_cache(data: Any) -> tuple:
+        """
+        The rates in a cache file, and the time they were fetched.
+
+        Caches written before the sync time was recorded are a bare
+        ``{model_id: rates}`` map. Those are read rather than discarded — the
+        rates in them are real and current, and only the "when" is missing, so
+        they load with an unknown sync time rather than none of their figures.
+        """
+        if not isinstance(data, dict):
+            return {}, None
+        if isinstance(data.get("models"), dict):
+            return data["models"], data.get("synced_at")
+        return data, None
+
     @classmethod
     def save_overrides(cls, cache_file: Path):
-        """Persist current pricing registry to cache file."""
+        """Persist current pricing registry, and its sync time, to cache file."""
         try:
             cache_file.parent.mkdir(parents=True, exist_ok=True)
             with open(cache_file, "w", encoding="utf-8") as f:
-                json.dump(cls.get_all_raw(), f, indent=2)
+                json.dump({"synced_at": cls.synced_at, "models": cls.get_all_raw()}, f, indent=2)
         except Exception as e:
             logger.warning(f"Failed to save pricing overrides to {cache_file}: {e}")

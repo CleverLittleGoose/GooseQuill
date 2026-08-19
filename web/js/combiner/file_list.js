@@ -67,7 +67,7 @@ export function renderCombinerFileList({ onToggle, onMove } = {}) {
         <div style="font-weight: 600; font-size: 15px; color: var(--text-main);">${query ? 'No matching documents found' : `No markdowns in "${sourceFolder}"`}</div>
         <p class="text-sm text-muted">${pdfCount > 0 ? `Contains ${pdfCount} PDFs that need OCR conversion.` : (query ? 'Try a different search term.' : 'No converted documents in this folder.')}</p>
         <div style="display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 10px;">
-          ${pdfCount > 0 && !query ? `<button class="btn btn-sm btn-primary btn-convert-folder-now">🚀 Convert Folder (${pdfCount})</button>` : ''}
+          ${pdfCount > 0 && !query ? `<button class="btn btn-sm btn-primary btn-convert-folder-now"><svg class="btn-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"></path></svg>Convert Folder (${pdfCount})</button>` : ''}
           <button class="btn btn-sm btn-secondary btn-switch-all-now">View all converted (${combinableFiles().length})</button>
         </div>
       </div>

@@ -1,7 +1,11 @@
 import os
 import sys
 from pathlib import Path
+import shutil
+import tempfile
 import unittest
+from contextlib import contextmanager
+from datetime import datetime, timezone
 from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -11,11 +15,34 @@ if str(PROJECT_ROOT) not in sys.path:
 from fixtures import SAMPLE_MARKDOWN
 from starlette.testclient import TestClient
 import app as app_module
-from app import app, PRICING
+from app import app
+from goosequill.models.pricing import PricingRegistry
 
 class TestApiEndpoints(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
+
+    @contextmanager
+    def _sandboxed_pricing(self):
+        """
+        Run a pricing sync without touching the developer's own cache.
+
+        /api/sync_pricing writes to the project's real ``.cache/`` and replaces
+        the process-wide registry. Left alone, running the suite would silently
+        overwrite the rates the app uses with the ones in the test fixture —
+        and the order tests happened to run in would decide what the later ones
+        were costed against.
+        """
+        saved_models = dict(PricingRegistry.MODELS)
+        saved_synced_at = PricingRegistry.synced_at
+        scratch = Path(tempfile.mkdtemp())
+        try:
+            with mock.patch.object(app_module, "CACHE_DIR", scratch):
+                yield
+        finally:
+            PricingRegistry.MODELS = saved_models
+            PricingRegistry.synced_at = saved_synced_at
+            shutil.rmtree(scratch, ignore_errors=True)
 
     def test_favicon_endpoint(self):
         """Test /favicon.ico returns 200 OK and image/svg+xml."""
@@ -71,7 +98,7 @@ class TestApiEndpoints(unittest.TestCase):
             "gemini-2.5-flash-lite",
         ]
         for m in expected_models:
-            self.assertIn(m, PRICING, f"Model {m} missing from PRICING rate card")
+            self.assertIn(m, PricingRegistry.MODELS, f"Model {m} missing from the pricing registry")
 
     def test_pricing_endpoint_serves_the_registry_the_costs_use(self):
         """
@@ -85,12 +112,46 @@ class TestApiEndpoints(unittest.TestCase):
 
         self.assertIn("pricing", data)
         self.assertIn("default_model", data)
-        self.assertEqual(data["pricing"], PRICING, "must be the live registry, not a copy")
+        self.assertEqual(data["pricing"], PricingRegistry.get_all_raw(),
+                         "must be the live registry, not a snapshot taken at import")
         self.assertIn(data["default_model"], data["pricing"], "the default has to be a model we price")
 
         for key, model in data["pricing"].items():
             for field in ("name", "input_standard", "output_standard", "input_batch", "output_batch", "tier"):
                 self.assertIn(field, model, f"{key} is missing {field}, which the rate card renders")
+
+    def test_pricing_endpoint_says_when_the_rates_were_synced(self):
+        """
+        The rate card prints this beside the Sync button. Without it a card
+        showing the rates the release shipped with is indistinguishable from
+        one fetched this morning — same figures, same table.
+        """
+        data = self.client.get("/api/pricing").json()
+        self.assertIn("synced_at", data, "the rate card cannot date itself without this")
+
+        # None is a real answer — nobody has synced — but anything else has to be
+        # a timestamp the browser can parse, not a free-form string.
+        if data["synced_at"] is not None:
+            parsed = datetime.fromisoformat(data["synced_at"])
+            self.assertIsNotNone(parsed.tzinfo,
+                                 "a bare local time cannot be placed once the machine moves")
+
+    def test_a_successful_sync_reports_the_time_it_happened(self):
+        """The card updates from this response, so the response has to carry it."""
+        class _StubResponse:
+            status_code = 200
+            text = SAMPLE_MARKDOWN
+
+        before = datetime.now(timezone.utc).replace(microsecond=0)
+        with self._sandboxed_pricing(), \
+             mock.patch("goosequill.services.pricing_sync.requests.get",
+                        return_value=_StubResponse()):
+            data = self.client.post("/api/sync_pricing").json()
+
+        self.assertEqual(data["status"], "success")
+        self.assertIn("synced_at", data)
+        self.assertGreaterEqual(datetime.fromisoformat(data["synced_at"]), before,
+                                "the stamp must be this sync, not a stale one")
 
     def test_every_batch_rate_is_half_the_standard_one(self):
         """The view promises a 50% discount in its own heading."""
@@ -110,7 +171,8 @@ class TestApiEndpoints(unittest.TestCase):
             status_code = 200
             text = SAMPLE_MARKDOWN
 
-        with mock.patch("goosequill.services.pricing_sync.requests.get",
+        with self._sandboxed_pricing(), \
+             mock.patch("goosequill.services.pricing_sync.requests.get",
                         return_value=_StubResponse()) as fetch:
             res = self.client.post("/api/sync_pricing")
             self.assertTrue(fetch.called, "endpoint should fetch the pricing document")
@@ -124,7 +186,8 @@ class TestApiEndpoints(unittest.TestCase):
 
     def test_sync_pricing_survives_upstream_failure(self):
         """A dead or changed upstream must degrade gracefully, never 500."""
-        with mock.patch("goosequill.services.pricing_sync.requests.get",
+        with self._sandboxed_pricing(), \
+             mock.patch("goosequill.services.pricing_sync.requests.get",
                         side_effect=Exception("network down")):
             res = self.client.post("/api/sync_pricing")
 

@@ -2,6 +2,21 @@
  * Object-Oriented Markdown Rendering Service for GooseQuill
  * Encapsulates an isolated marked.Marked instance and DOMPurify sanitization.
  */
+/*
+ * The stand-in for a picture the document refers to but does not carry.
+ *
+ * Transcribed filings name images by relative path — barcode.png, logo.jpg —
+ * which resolve to nothing and would render as a broken-image icon. This badge
+ * says what was there instead. Drawn rather than typed: it was 🖼️, which every
+ * platform renders in its own style and colour regardless of the theme.
+ */
+const IMAGE_GLYPH =
+  '<svg class="md-image-glyph" viewBox="0 0 24 24" aria-hidden="true">' +
+  '<rect x="3" y="4" width="18" height="16" rx="2"></rect>' +
+  '<circle cx="8.5" cy="9.5" r="1.5"></circle>' +
+  '<path d="M21 16l-5-5L5 20"></path>' +
+  '</svg>';
+
 export class MarkdownRenderer {
   constructor(options = {}) {
     this.options = {
@@ -95,7 +110,7 @@ export class MarkdownRenderer {
           // Relative/missing filenames (e.g. barcode.png, logo.jpg) -> Render pleasant badge instead of 404
           const label = imgText || imgTitle || imgHref.split("/").pop() || "Document Graphic";
           const esc = MarkdownRenderer.escapeAttribute;
-          return `<span class="badge" style="font-size: 12.5px; font-family: var(--font-sans); background: rgba(255,255,255,0.07); color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.1); padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px;" title="${esc(imgHref)}">🖼️ ${esc(label)}</span>`;
+          return `<span class="badge md-image-badge" title="${esc(imgHref)}">${IMAGE_GLYPH}${esc(label)}</span>`;
         },
 
         // Responsive table wrapper for financial statements & data tables
@@ -147,9 +162,11 @@ export class MarkdownRenderer {
           // Replace raw <img> with a clean span badge
           const label = node.getAttribute("alt") || src.split("/").pop() || "Document Graphic";
           const span = document.createElement("span");
-          span.className = "badge";
-          span.style.cssText = "font-size: 12.5px; background: rgba(255,255,255,0.07); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.1); padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px;";
-          span.textContent = `🖼️ ${label}`;
+          span.className = "badge md-image-badge";
+          // The glyph is our own literal markup; the label came out of the
+          // document, so it goes in as text and never as HTML.
+          span.innerHTML = IMAGE_GLYPH;
+          span.appendChild(document.createTextNode(label));
           if (node.parentNode) {
             node.parentNode.replaceChild(span, node);
           }

@@ -144,7 +144,7 @@ export function renderSidebarFolders() {
         <span class="entity-name">All Folders</span>
       </div>
       <div class="entity-right">
-        ${totalBatchActive > 0 ? `<span class="progress-pill batch" title="${totalBatchActive} in Gemini Batch">⏳ ${totalBatchActive}</span>` : ""}
+        ${totalBatchActive > 0 ? `<span class="progress-pill batch" title="${totalBatchActive} in Gemini Batch"><svg class="pill-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10M7 21h10"></path><path d="M8 3v4.5a4 4 0 0 0 1.6 3.2L12 12l-2.4 1.3A4 4 0 0 0 8 16.5V21"></path><path d="M16 3v4.5a4 4 0 0 1-1.6 3.2L12 12l2.4 1.3a4 4 0 0 1 1.6 3.2V21"></path></svg>${totalBatchActive}</span>` : ""}
         <span class="progress-pill ${totalConverted === totalDocs && totalDocs > 0 ? 'completed' : ''}">${totalConverted}/${totalDocs}</span>
       </div>
     `;
@@ -194,8 +194,8 @@ export function renderSidebarFolders() {
         <span class="entity-name">${f.name}</span>
       </div>
       <div class="entity-right">
-        ${batchActive > 0 ? `<span class="progress-pill batch" title="${batchActive} in batch">⏳ ${batchActive}</span>` : ""}
-        <span class="${progressClass}">${converted === count && count > 0 ? `${converted}/${count} ✓` : `${converted}/${count}`}</span>
+        ${batchActive > 0 ? `<span class="progress-pill batch" title="${batchActive} in batch"><svg class="pill-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10M7 21h10"></path><path d="M8 3v4.5a4 4 0 0 0 1.6 3.2L12 12l-2.4 1.3A4 4 0 0 0 8 16.5V21"></path><path d="M16 3v4.5a4 4 0 0 1-1.6 3.2L12 12l2.4 1.3a4 4 0 0 1 1.6 3.2V21"></path></svg>${batchActive}</span>` : ""}
+        <span class="${progressClass}">${converted === count && count > 0 ? `${converted}/${count}<svg class="pill-glyph" viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>` : `${converted}/${count}`}</span>
       </div>
     `;
 

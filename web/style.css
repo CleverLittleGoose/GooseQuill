@@ -645,12 +645,28 @@ input[type="checkbox"]:focus-visible {
 }
 
 .progress-pill {
+  /* inline-flex so the drawn glyph sits on the digits' optical centre rather
+     than on the text baseline, which is where a typed ⏳ or ✓ used to land. */
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12.5px;
   font-family: var(--font-mono);
   padding: 3px 9px;
   border-radius: var(--radius-xs);
   background: rgba(255, 255, 255, 0.08);
   color: var(--text-muted);
+}
+
+.progress-pill .pill-glyph {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .progress-pill.completed {
@@ -919,6 +935,22 @@ input[type="checkbox"]:focus-visible {
   /* Without this the tick wrapped onto its own line above the word once the
      column tightened, which read as a stray mark rather than part of a badge. */
   white-space: nowrap;
+}
+
+/*
+ * The tick and the ready dot, drawn. They were "✓" and "●" typed into the
+ * label, which put them at the mercy of the platform's font — and next to the
+ * batch spinner, which was always a real element, they never quite matched.
+ */
+.status-badge .status-glyph {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .status-badge.converted {
@@ -1403,10 +1435,6 @@ input[type="checkbox"]:focus-visible {
   font-size: 14.5px;
 }
 
-.view-placeholder .view-placeholder-glyph {
-  opacity: 0.35;
-}
-
 .economics-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1829,6 +1857,67 @@ input[type="checkbox"]:focus-visible {
 .pricing-doc-link-text a:hover {
   color: #7dd3fc;
 }
+/*
+ * The stand-in for a picture a transcribed filing names but does not carry.
+ * The two places that build it — the renderer and the sanitiser hook — used to
+ * each carry their own copy of these rules as an inline style string, and had
+ * already drifted apart on font-family and colour.
+ */
+.md-image-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-family: var(--font-sans);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.md-image-badge .md-image-glyph {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The stamp and the button that changes it, on one line and vertically centred. */
+.pricing-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/*
+ * When the rate card was last checked against Google's published rates.
+ *
+ * Quiet by default — it is provenance, not a headline, and a fresh card should
+ * not shout. It goes amber only when the figures have not been checked in a
+ * month, or never have been, because that is the one case where the reader is
+ * looking at something they may be wrong to trust.
+ */
+.pricing-synced-at {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pricing-synced-at.stale {
+  color: var(--accent-amber);
+}
+
+/* Nothing to say yet — collapse rather than leave a gap beside the button. */
+.pricing-synced-at:empty {
+  display: none;
+}
+
 .pricing-doc-link-container {
   font-size: 12px;
   color: var(--text-muted);
@@ -1918,9 +2007,23 @@ input[type="checkbox"]:focus-visible {
   color: #94a3b8;
 }
 .spec-rec-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-weight: 600;
   color: #fbbf24;
   white-space: nowrap;
+}
+
+.spec-rec-label .spec-rec-glyph {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .spec-rec-text {
   color: #cbd5e1;
@@ -2425,6 +2528,11 @@ input[type="checkbox"]:focus-visible {
 .btn-sm .btn-glyph {
   width: 14px;
   height: 14px;
+}
+
+.btn-xs .btn-glyph {
+  width: 13px;
+  height: 13px;
 }
 
 /*
@@ -3075,8 +3183,20 @@ body.is-resizing-panes .studio-pane {
   color: var(--text-secondary);
 }
 
+/*
+ * Drawn, like the rest. This was 🔎 and ∅ at 34px — one an emoji that each
+ * platform draws its own way, the other a maths symbol standing in for a
+ * picture. Both now stroke in the current text colour at the weight everything
+ * else uses.
+ */
 .search-empty-icon {
-  font-size: 34px;
+  width: 38px;
+  height: 38px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   opacity: 0.5;
   margin-bottom: 10px;
 }
@@ -3582,8 +3702,24 @@ body.is-resizing-panes .studio-pane {
   color: var(--accent-amber);
 }
 
+/*
+ * Drawn, like every other icon. A "⚠" typed into `content` is at the mercy of
+ * the platform's font — and on the ones that give it emoji presentation it
+ * arrives in its own red-and-yellow, ignoring the amber this rule just set.
+ *
+ * Masked rather than used as a background image, so the shape takes
+ * `currentColor` and stays the same amber as the text it qualifies.
+ */
 .diff-summary-wholesale::after {
-  content: " ⚠";
+  content: "";
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin-left: 5px;
+  vertical-align: -2px;
+  background-color: currentColor;
+  -webkit-mask: url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10.3%203.9%201.8%2018a2%202%200%200%200%201.7%203h17a2%202%200%200%200%201.7-3L13.7%203.9a2%202%200%200%200-3.4%200z%22%2F%3E%3Cpath%20d%3D%22M12%209v4M12%2017h.01%22%2F%3E%3C%2Fsvg%3E') center / contain no-repeat;
+  mask: url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10.3%203.9%201.8%2018a2%202%200%200%200%201.7%203h17a2%202%200%200%200%201.7-3L13.7%203.9a2%202%200%200%200-3.4%200z%22%2F%3E%3Cpath%20d%3D%22M12%209v4M12%2017h.01%22%2F%3E%3C%2Fsvg%3E') center / contain no-repeat;
 }
 
 /* ==========================================================================

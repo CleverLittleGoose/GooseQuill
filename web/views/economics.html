@@ -23,6 +23,12 @@
               <div class="card-header-flex">
                 <h3 class="card-title">Official Google Gemini Rate Card</h3>
                 <div class="pricing-actions">
+                  <!--
+                    Beside the button, not under the table: the reader's question
+                    is "can I trust these figures", and the answer belongs next to
+                    the control that changes it.
+                  -->
+                  <span class="pricing-synced-at" id="rateCardSyncedAt"></span>
                   <button class="btn btn-outline-night btn-sm" id="econSyncPricingBtn" title="Sync live rates from Google AI Docs">
                     <svg id="econSyncSpinner" class="sync-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
                       <path d="M23 4v6h-6"></path>

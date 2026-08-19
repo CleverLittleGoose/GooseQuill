@@ -1,7 +1,7 @@
 import re
-import time
 import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional
 import requests
@@ -71,13 +71,18 @@ class PricingSyncService:
                     PricingRegistry.update_model_pricing(model_id, updated)
                     updated_keys.append(model_id)
 
+            # Recorded before saving, so the file carries the time its rates
+            # were fetched. UTC and ISO-8601: this is read back on a later run,
+            # possibly in another timezone, and a bare local clock reading
+            # cannot be placed once the machine has moved.
+            PricingRegistry.synced_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
             PricingRegistry.save_overrides(self.cache_file)
 
             return {
                 "status": "success",
                 "message": f"Successfully updated rates for {len(updated_keys)} Gemini models from Google AI docs.",
                 "updated_models": updated_keys,
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "synced_at": PricingRegistry.synced_at,
                 "pricing": PricingRegistry.get_all_raw()
             }
         except Exception as e:

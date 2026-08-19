@@ -229,7 +229,11 @@ export async function startConversion(files) {
   });
 
   if (activeRunningDocs.length > 0) {
-    const proceed = confirm(`⚠️ Notice: ${activeRunningDocs.length} of the selected document(s) are already processing in an active Gemini Batch job.\n\nRunning standard conversion now will duplicate the processing.\n\nDo you want to proceed anyway?`);
+    // A native confirm() renders plain text and nothing else, so this one
+    // cannot take a drawn icon. The word "Notice" was already carrying the
+    // meaning; the emoji in front of it was decoration the dialog draws in
+    // whatever style the platform feels like.
+    const proceed = confirm(`Notice: ${activeRunningDocs.length} of the selected document(s) are already processing in an active Gemini Batch job.\n\nRunning standard conversion now will duplicate the processing.\n\nDo you want to proceed anyway?`);
     if (!proceed) return;
   }
 

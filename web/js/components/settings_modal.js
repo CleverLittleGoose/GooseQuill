@@ -142,6 +142,10 @@ export function initSettingsModal() {
       if (res && res.status === "success") {
         if (res.pricing) {
           appState.pricing = res.pricing;
+          // The rate card reports this next to the button that was just pressed,
+          // so a successful sync has to move it — otherwise the card still says
+          // "never synced" over figures that have this moment been fetched.
+          appState.pricingSyncedAt = res.synced_at || null;
           updateModelSpecs(modelSelect ? modelSelect.value : appState.model);
           // The Economics rate card is drawn from this same registry, so it has
           // to be redrawn — otherwise the sync reports success over a table

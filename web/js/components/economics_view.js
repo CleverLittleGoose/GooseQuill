@@ -49,6 +49,63 @@ export function money(value) {
   return `$${whole}.${fraction.padEnd(2, "0")}`;
 }
 
+/**
+ * How long ago the rate card was fetched, in words, and whether that is long
+ * enough to distrust.
+ *
+ * `/api/pricing` serves the registry, and the registry is the rates bundled
+ * with this release until somebody presses Sync. Both look identical in the
+ * table — the same figures, laid out the same way — so a card frozen at
+ * whenever the release was cut reads exactly like one fetched this morning.
+ * This is the line that tells them apart.
+ *
+ * `now` is a parameter so the wording can be tested without waiting.
+ * Exported for testing.
+ */
+export function syncStampText(syncedAt, now = Date.now()) {
+  const STALE_AFTER_DAYS = 30;
+
+  if (!syncedAt) {
+    return {
+      text: "Never synced — showing the rates bundled with this release",
+      title: "These are the figures GooseQuill shipped with. Sync to check them against Google's published rates.",
+      stale: true
+    };
+  }
+
+  const then = Date.parse(syncedAt);
+  if (!Number.isFinite(then)) {
+    // A cache file we cannot read the date out of. Saying so is better than
+    // printing "Invalid Date" or silently claiming the rates are fresh.
+    return {
+      text: "Synced at an unknown time",
+      title: `The recorded sync time could not be read: ${syncedAt}`,
+      stale: true
+    };
+  }
+
+  // Signed on purpose. A browser clock a little behind the server's makes this
+  // negative, and the "just now" branch below absorbs that — clamping it to
+  // zero here would be a second guard doing the same job, and an untestable one.
+  const seconds = Math.round((now - then) / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  let when;
+  if (seconds < 60) when = "just now";
+  else if (minutes < 60) when = `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  else if (hours < 24) when = `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  else when = `${days} day${days === 1 ? "" : "s"} ago`;
+
+  return {
+    text: `Rates synced ${when}`,
+    // The exact moment, in the reader's own timezone, for anyone who wants it.
+    title: new Date(then).toLocaleString(),
+    stale: days >= STALE_AFTER_DAYS
+  };
+}
+
 function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
@@ -74,8 +131,21 @@ function rowFor(key, model, defaultModel) {
     </tr>`;
 }
 
+/** Say when these figures were last checked against Google's. */
+function renderSyncStamp() {
+  const stamp = document.getElementById("rateCardSyncedAt");
+  if (!stamp) return;
+
+  const { text, title, stale } = syncStampText(appState.pricingSyncedAt);
+  stamp.textContent = text;
+  stamp.title = title;
+  stamp.classList.toggle("stale", stale);
+}
+
 /** Draw whatever pricing we currently hold. */
 export function renderRateCard() {
+  renderSyncStamp();
+
   const body = document.getElementById("rateCardTableBody");
   if (!body) return;
 
@@ -101,6 +171,7 @@ async function loadRateCard() {
     const res = await apiClient.getPricing();
     appState.pricing = (res && res.pricing) || {};
     appState.defaultModel = (res && res.default_model) || appState.model;
+    appState.pricingSyncedAt = (res && res.synced_at) || null;
     renderRateCard();
   } catch (e) {
     if (body) {

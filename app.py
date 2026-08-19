@@ -22,7 +22,6 @@ from goosequill.models import (
     JobProgress
 )
 
-PRICING = PricingRegistry.get_all_raw()
 from goosequill.services.genai_factory import describe_backend
 from goosequill.services import (
     PDFRenderer,
@@ -351,7 +350,10 @@ def get_pricing():
     """
     return {
         "pricing": PricingRegistry.get_all_raw(),
-        "default_model": PricingRegistry.DEFAULT_MODEL
+        "default_model": PricingRegistry.DEFAULT_MODEL,
+        # None until someone syncs, which is how the card can say it is showing
+        # the rates this release shipped with rather than implying they are current.
+        "synced_at": PricingRegistry.synced_at
     }
 
 @app.post("/api/sync_pricing")

@@ -324,9 +324,9 @@ export function renderDocuments() {
       ? `<span class="year-badge has-year">${year}</span>`
       : `<span class="year-badge">—</span>`;
 
-    let statusBadge = `<span class="status-badge ready">● Ready</span>`;
+    let statusBadge = `<span class="status-badge ready"><svg class="status-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="currentColor" stroke="none"></circle></svg>Ready</span>`;
     if (doc.is_converted) {
-      statusBadge = `<span class="status-badge converted">✓ Converted</span>`;
+      statusBadge = `<span class="status-badge converted"><svg class="status-glyph" viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>Converted</span>`;
     } else if (doc.batch_status === "JOB_STATE_RUNNING") {
       statusBadge = `<span class="status-badge batch-running"><span class="spinner" style="width: 10px; height: 10px; border-width: 1.5px;"></span>In Batch</span>`;
     } else if (doc.batch_status === "JOB_STATE_PENDING") {

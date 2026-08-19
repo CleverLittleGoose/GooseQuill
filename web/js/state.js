@@ -34,6 +34,9 @@ export const appState = {
   recentLogs: [],
   jobErrors: [],
   pricing: {},
+  // When those rates were last fetched from Google, ISO-8601, or null if they
+  // have never been — which means they are the ones bundled with the release.
+  pricingSyncedAt: null,
   // Which model the server treats as the default, so the rate card can mark it.
   defaultModel: "",
   stats: {},
