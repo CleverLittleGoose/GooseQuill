@@ -6,6 +6,11 @@
 # logic. The frontend tests use Node's built-in runner — no dependency to
 # install, and skipped with a warning rather than a failure if Node is absent,
 # since the app itself does not need it.
+#
+# One exception, on the same terms: the highlighting tests need a real DOM, and
+# use jsdom. It is a devDependency and nothing but those tests ever loads it, so
+# an `npm install` is optional — without it those tests report as skipped and
+# everything else runs as before.
 # ==============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"

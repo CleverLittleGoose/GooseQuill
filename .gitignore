@@ -19,6 +19,10 @@ __pycache__/
 venv/
 .venv/
 
+# Test-only Node dependency (jsdom). The app never loads it, and the suite
+# skips the tests that need it when it is not installed.
+node_modules/
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db

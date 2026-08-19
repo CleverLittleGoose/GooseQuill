@@ -212,7 +212,22 @@ pytest tests
 
 The suite is hermetic — it makes no network calls, so it runs offline and in CI.
 
-There is one opt-in exception. Google occasionally changes the format of its
+#### The frontend tests
+
+They run on Node's built-in test runner, so there is nothing to install. One
+group is the exception: the tests for search highlighting need a real DOM and
+use [jsdom](https://github.com/jsdom/jsdom). It is a development dependency and
+nothing in GooseQuill itself ever loads it — the app is Python serving static
+files, and does not need Node at all.
+
+Without it those tests report as skipped and everything else runs as normal. To
+run them:
+
+```bash
+npm install
+```
+
+There are two opt-in exceptions. Google occasionally changes the format of its
 published pricing document, which would silently break the **Sync Pricing**
 feature. This check catches that, and is skipped unless you ask for it:
 

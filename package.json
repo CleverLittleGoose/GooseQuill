@@ -1,0 +1,11 @@
+{
+  "name": "goosequill-tests",
+  "private": true,
+  "description": "Test-only manifest. GooseQuill itself is a Python app served to a browser; nothing here is shipped, imported by the app, or needed to run it. jsdom exists so one function that walks real text nodes can be tested against a real DOM, and the suite skips those tests cleanly when it is absent.",
+  "scripts": {
+    "test": "node --test \"tests/frontend/*.test.mjs\""
+  },
+  "devDependencies": {
+    "jsdom": "^27.0.0"
+  }
+}
