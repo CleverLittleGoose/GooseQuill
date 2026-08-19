@@ -88,6 +88,190 @@ class MarkdownCombinerService:
         return cleaned
 
     @classmethod
+    def _collect(
+        cls,
+        file_paths: List[str | Path],
+        sort_mode: str = "custom"
+    ) -> List[Dict[str, Any]]:
+        """
+        Work out what is going into the document, without keeping any of it.
+
+        Each file is read once here to count its pages and then let go of. The
+        content is read again when its section is written. That is two passes
+        over the workspace instead of one, and it is the whole point: the table
+        of contents has to know every document's page count before the first
+        section can be written, and holding every document in memory to satisfy
+        that is what put a ceiling on how large a consolidation could be.
+        """
+        docs: List[Dict[str, Any]] = []
+
+        for p_str in file_paths:
+            md_path = cls.resolve_markdown_path(p_str)
+            if not md_path:
+                continue
+
+            try:
+                with open(md_path, "r", encoding="utf-8") as f:
+                    raw_content = f.read()
+                pages_count = cls.count_pages_in_markdown(raw_content)
+            except Exception:
+                continue
+
+            stem = md_path.stem
+            folder_name = md_path.parent.parent.name if md_path.parent.name == "Markdown" else md_path.parent.name
+
+            docs.append({
+                "path": str(md_path),
+                "filename": md_path.name,
+                "stem": stem,
+                "title": stem,
+                "folder": folder_name,
+                "pages": pages_count
+            })
+
+        if not docs:
+            raise ValueError("No valid or readable Markdown files found from the provided paths.")
+
+        return cls.sort_documents(docs, sort_mode=sort_mode)
+
+    @classmethod
+    def _resolve_title(cls, master_title: Optional[str], sorted_docs: List[Dict[str, Any]]) -> str:
+        if master_title and master_title.strip():
+            return master_title
+
+        folders = set(d["folder"] for d in sorted_docs if d["folder"])
+        if len(folders) == 1 and list(folders)[0] and list(folders)[0] not in ("Accounts", "documents", "PDFs"):
+            return f"Consolidated Accounts & Filings — {list(folders)[0]}"
+        return f"Consolidated Markdown Document ({len(sorted_docs)} Documents)"
+
+    @classmethod
+    def _iter_parts(
+        cls,
+        sorted_docs: List[Dict[str, Any]],
+        master_title: str,
+        include_toc: bool,
+        include_source_meta: bool,
+        strip_original_headers: bool
+    ):
+        """
+        Yield the document a piece at a time, in the order it is written.
+
+        Only one source document is held at once. Everything before the
+        sections is derived from the metadata gathered by `_collect`.
+        """
+        total_documents = len(sorted_docs)
+        total_pages = sum(d["pages"] for d in sorted_docs)
+
+        # 1. Master Document Header
+        yield f"# {master_title}\n"
+        yield (
+            f"> **Consolidated Archive**: {total_documents} Document(s)  \n"
+            f"> **Total Pages**: {total_pages} pages  \n"
+            f"> **Generated via**: GooseQuill on {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+        )
+
+        # 2. Table of Contents
+        if include_toc:
+            yield "## 📋 Table of Contents\n"
+            yield "| # | Document | Year / Period | Pages | Section Link |"
+            yield "| :-: | :--- | :-: | :-: | :--- |"
+
+            for idx, doc in enumerate(sorted_docs, 1):
+                doc_title = doc["title"]
+                year = cls.extract_year_from_name(doc_title)
+                year_str = str(year) if year != 9999 else "—"
+                section_heading = f"{idx}. {doc_title}"
+                anchor = cls.generate_slug(section_heading)
+                yield (
+                    f"| {idx} | {doc_title} | {year_str} | {doc['pages']} pgs | [View Section &rarr;](#{anchor}) |"
+                )
+            yield "\n---\n"
+
+        # 3. Document Sections
+        for idx, doc in enumerate(sorted_docs, 1):
+            doc_title = doc["title"]
+            section_heading = f"{idx}. {doc_title}"
+
+            yield f"\n# {section_heading}\n"
+
+            if include_source_meta:
+                yield f"> 📄 **Source**: `{doc['filename']}`  "
+                yield f"> 📂 **Folder**: `{doc['folder']}` | **Pages**: {doc['pages']} pages  \n"
+
+            try:
+                with open(doc["path"], "r", encoding="utf-8") as f:
+                    raw_content = f.read()
+            except Exception:
+                raw_content = ""
+
+            if strip_original_headers:
+                content_to_insert = cls.clean_individual_markdown(raw_content)
+            else:
+                content_to_insert = raw_content
+
+            yield content_to_insert.strip()
+            yield "\n\n---\n"
+
+    @staticmethod
+    def _stream_parts(handle, parts) -> Tuple[int, int]:
+        """
+        Write the parts exactly as `"\n".join(parts).strip() + "\n"` would, and
+        report (chars, words), without ever holding the joined document.
+
+        Only the final part can need trimming, so one part of lookahead is all
+        it takes to reproduce the trailing `.strip()`.
+        """
+        total_chars = 0
+        total_words = 0
+        first = True
+
+        def emit(text: str, last: bool = False) -> None:
+            nonlocal total_chars, first
+            payload = text if first else "\n" + text
+            if first:
+                payload = payload.lstrip()
+                first = False
+            if last:
+                payload = payload.rstrip()
+            handle.write(payload)
+            total_chars += len(payload)
+
+        pending = None
+        for part in parts:
+            if pending is not None:
+                emit(pending)
+                total_words += len(pending.split())
+            pending = part
+
+        if pending is not None:
+            emit(pending, last=True)
+            total_words += len(pending.split())
+
+        handle.write("\n")
+        total_chars += 1
+
+        return total_chars, total_words
+
+    @staticmethod
+    def _summary(master_title: str, sorted_docs: List[Dict[str, Any]], chars: int, words: int) -> Dict[str, Any]:
+        return {
+            "title": master_title,
+            "total_documents": len(sorted_docs),
+            "total_pages": sum(d["pages"] for d in sorted_docs),
+            "total_words": words,
+            "total_chars": chars,
+            "documents": [
+                {
+                    "title": d["title"],
+                    "path": d["path"],
+                    "folder": d["folder"],
+                    "pages": d["pages"]
+                }
+                for d in sorted_docs
+            ]
+        }
+
+    @classmethod
     def combine(
         cls,
         file_paths: List[str | Path],
@@ -99,7 +283,11 @@ class MarkdownCombinerService:
     ) -> Dict[str, Any]:
         """
         Consolidate multiple markdown files into a single unified markdown document.
-        
+
+        Builds the whole thing in memory, so it is for previews and for outputs
+        small enough to be handed straight back. Use `combine_to_file` for a
+        consolidation that is going to disk.
+
         Returns:
             Dict containing:
             - content: Full consolidated markdown string
@@ -109,117 +297,66 @@ class MarkdownCombinerService:
             - total_chars: int
             - documents: List of processed document details
         """
-        raw_docs: List[Dict[str, Any]] = []
+        sorted_docs = cls._collect(file_paths, sort_mode=sort_mode)
+        master_title = cls._resolve_title(master_title, sorted_docs)
 
-        for p_str in file_paths:
-            md_path = cls.resolve_markdown_path(p_str)
-            if not md_path:
-                continue
+        parts = list(cls._iter_parts(
+            sorted_docs, master_title, include_toc, include_source_meta, strip_original_headers
+        ))
+        full_content = "\n".join(parts).strip() + "\n"
 
-            try:
-                with open(md_path, "r", encoding="utf-8") as f:
-                    raw_content = f.read()
+        summary = cls._summary(master_title, sorted_docs, len(full_content), len(full_content.split()))
+        summary["content"] = full_content
+        return summary
 
-                stem = md_path.stem
-                pages_count = cls.count_pages_in_markdown(raw_content)
-                folder_name = md_path.parent.parent.name if md_path.parent.name == "Markdown" else md_path.parent.name
+    @classmethod
+    def combine_to_file(
+        cls,
+        output_path: str | Path,
+        file_paths: List[str | Path],
+        master_title: Optional[str] = None,
+        include_toc: bool = True,
+        include_source_meta: bool = True,
+        strip_original_headers: bool = True,
+        sort_mode: str = "custom"
+    ) -> Dict[str, Any]:
+        """
+        Assemble the consolidation straight onto disk.
 
-                raw_docs.append({
-                    "path": str(md_path),
-                    "filename": md_path.name,
-                    "stem": stem,
-                    "title": stem,
-                    "folder": folder_name,
-                    "pages": pages_count,
-                    "raw_content": raw_content
-                })
-            except Exception:
-                continue
+        Byte-for-byte what `combine` produces, but the peak cost is one source
+        document rather than the finished article three times over — once in the
+        documents read up front, once in the list of parts, and once in the
+        string they are joined into. A whole-workspace consolidation no longer
+        has a size at which it stops working.
 
-        if not raw_docs:
-            raise ValueError("No valid or readable Markdown files found from the provided paths.")
+        Returns the same summary as `combine`, with `saved_path` in place of
+        `content`.
+        """
+        out = Path(output_path)
+        out.parent.mkdir(parents=True, exist_ok=True)
 
-        # Apply Sorting
-        sorted_docs = cls.sort_documents(raw_docs, sort_mode=sort_mode)
+        sorted_docs = cls._collect(file_paths, sort_mode=sort_mode)
+        master_title = cls._resolve_title(master_title, sorted_docs)
 
-        # Compute aggregate metrics
-        total_documents = len(sorted_docs)
-        total_pages = sum(d["pages"] for d in sorted_docs)
+        parts = cls._iter_parts(
+            sorted_docs, master_title, include_toc, include_source_meta, strip_original_headers
+        )
 
-        # Determine master title if not provided
-        if not master_title or not master_title.strip():
-            folders = set(d["folder"] for d in sorted_docs if d["folder"])
-            if len(folders) == 1 and list(folders)[0] and list(folders)[0] not in ("Accounts", "documents", "PDFs"):
-                master_title = f"Consolidated Accounts & Filings — {list(folders)[0]}"
-            else:
-                master_title = f"Consolidated Markdown Document ({total_documents} Documents)"
+        # A partial file left behind by a failure reads as a finished
+        # consolidation, so the write lands on a temporary name and is moved
+        # into place only once it is whole.
+        staging = out.with_name(out.name + ".partial")
+        try:
+            with open(staging, "w", encoding="utf-8") as handle:
+                chars, words = cls._stream_parts(handle, parts)
+            os.replace(staging, out)
+        except BaseException:
+            staging.unlink(missing_ok=True)
+            raise
 
-        doc_parts: List[str] = []
-
-        # 1. Master Document Header
-        doc_parts.append(f"# {master_title}\n")
-        doc_parts.append(f"> **Consolidated Archive**: {total_documents} Document(s)  \n> **Total Pages**: {total_pages} pages  \n> **Generated via**: GooseQuill on {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
-
-        # 2. Table of Contents
-        if include_toc:
-            doc_parts.append("## 📋 Table of Contents\n")
-            doc_parts.append("| # | Document | Year / Period | Pages | Section Link |")
-            doc_parts.append("| :-: | :--- | :-: | :-: | :--- |")
-
-            for idx, doc in enumerate(sorted_docs, 1):
-                doc_title = doc["title"]
-                year = cls.extract_year_from_name(doc_title)
-                year_str = str(year) if year != 9999 else "—"
-                section_heading = f"{idx}. {doc_title}"
-                anchor = cls.generate_slug(section_heading)
-                doc_parts.append(
-                    f"| {idx} | {doc_title} | {year_str} | {doc['pages']} pgs | [View Section &rarr;](#{anchor}) |"
-                )
-            doc_parts.append("\n---\n")
-
-        # 3. Document Sections
-        for idx, doc in enumerate(sorted_docs, 1):
-            doc_title = doc["title"]
-            section_heading = f"{idx}. {doc_title}"
-            
-            # Document Section Header
-            doc_parts.append(f"\n# {section_heading}\n")
-
-            if include_source_meta:
-                doc_parts.append(f"> 📄 **Source**: `{doc['filename']}`  ")
-                doc_parts.append(f"> 📂 **Folder**: `{doc['folder']}` | **Pages**: {doc['pages']} pages  \n")
-
-            # Content
-            if strip_original_headers:
-                content_to_insert = cls.clean_individual_markdown(doc["raw_content"])
-            else:
-                content_to_insert = doc["raw_content"]
-
-            doc_parts.append(content_to_insert.strip())
-            doc_parts.append("\n\n---\n")
-
-        full_content = "\n".join(doc_parts).strip() + "\n"
-
-        words_count = len(full_content.split())
-        chars_count = len(full_content)
-
-        return {
-            "title": master_title,
-            "content": full_content,
-            "total_documents": total_documents,
-            "total_pages": total_pages,
-            "total_words": words_count,
-            "total_chars": chars_count,
-            "documents": [
-                {
-                    "title": d["title"],
-                    "path": d["path"],
-                    "folder": d["folder"],
-                    "pages": d["pages"]
-                }
-                for d in sorted_docs
-            ]
-        }
+        summary = cls._summary(master_title, sorted_docs, chars, words)
+        summary["saved_path"] = str(out)
+        return summary
 
     @staticmethod
     def save_combined_document(output_path: str | Path, content: str) -> Path:

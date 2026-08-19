@@ -658,8 +658,7 @@ def combine_markdown(req: CombineMarkdownRequest):
 
         safe_files = [str(_resolve_within_root(f)) for f in req.files]
 
-        result = MarkdownCombinerService.combine(
-            file_paths=safe_files,
+        options = dict(
             master_title=req.master_title,
             include_toc=req.include_toc,
             include_source_meta=req.include_source_meta,
@@ -667,7 +666,7 @@ def combine_markdown(req: CombineMarkdownRequest):
             sort_mode=req.sort_mode
         )
 
-        saved_path = None
+        target_path = None
         if req.save_to_disk:
             filename = _safe_component(req.output_filename or "Consolidated_Document.md", "Output filename")
             if not filename.lower().endswith(".md"):
@@ -687,10 +686,20 @@ def combine_markdown(req: CombineMarkdownRequest):
             else:
                 dest_dir = BASE_ACCOUNTS_DIR / CONSOLIDATED_DIR_NAME
             dest_dir.mkdir(parents=True, exist_ok=True)
-
             target_path = dest_dir / filename
-            saved_p = MarkdownCombinerService.save_combined_document(target_path, result["content"])
-            saved_path = str(saved_p)
+
+        # A build that is only going to disk never needs the finished document
+        # in memory, so it is assembled straight onto it. The caller that wants
+        # the text back — a preview, which is capped at a handful of documents —
+        # still gets the in-memory build.
+        if target_path is not None and not req.return_content:
+            result = MarkdownCombinerService.combine_to_file(target_path, file_paths=safe_files, **options)
+            saved_path = result["saved_path"]
+        else:
+            result = MarkdownCombinerService.combine(file_paths=safe_files, **options)
+            saved_path = None
+            if target_path is not None:
+                saved_path = str(MarkdownCombinerService.save_combined_document(target_path, result["content"]))
 
         response = {
             "status": "success",
