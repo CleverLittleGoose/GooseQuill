@@ -41,7 +41,12 @@ export const appState = {
     sourceFolder: "ALL",
     cachedResult: null,
     previewTab: "rendered",
-    previewTimer: null
+    previewTimer: null,
+    // Consolidations contain the documents they were made from, so combining
+    // them again duplicates everything. Opt in.
+    includeConsolidated: false,
+    // True while the preview holds an extract rather than the whole document.
+    previewIsPartial: false
   }
 };
 

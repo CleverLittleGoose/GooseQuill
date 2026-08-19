@@ -99,8 +99,42 @@ export function initCombinerModal() {
   if (downloadBtn) downloadBtn.addEventListener("click", downloadCombinedMarkdown);
   if (saveBtn) saveBtn.addEventListener("click", saveCombinedMarkdown);
 
+  const includeConsolidated = document.getElementById("studioCombinerIncludeConsolidated");
+  if (includeConsolidated) {
+    includeConsolidated.addEventListener("change", () => {
+      appState.combiner.includeConsolidated = includeConsolidated.checked;
+      // Anything already picked that is no longer offered must go with it,
+      // or the selection would silently keep a file the list denies exists.
+      if (!includeConsolidated.checked) {
+        appState.combiner.selectedItems = appState.combiner.selectedItems.filter((f) => !f.isConsolidated);
+      }
+      renderCombinerFileList();
+      updateCombinerSourceSummary();
+      triggerCombinerPreviewDebounced();
+    });
+  }
+
   eventBus.on("studio:combiner:activated", () => openCombinerStudio());
   eventBus.on("modal:combiner:open", (paths) => openCombinerStudio(paths));
+}
+
+/**
+ * The documents that may be consolidated.
+ *
+ * A consolidation of a folder contains every document in that folder, so
+ * leaving them in the list means "Select Entity" quietly includes yesterday's
+ * consolidation alongside the documents it was made from — everything appears
+ * twice, and the file grows every time it is rebuilt. Combining consolidations
+ * is occasionally what someone wants, so this is a default rather than a rule.
+ */
+function updateCombinerSourceSummary() {
+  const el = document.getElementById("studioCombinerSourceSummary");
+  if (el) el.textContent = `${combinableFiles().length} converted`;
+}
+
+function combinableFiles() {
+  const all = appState.combiner.availableFiles || [];
+  return appState.combiner.includeConsolidated ? all : all.filter((f) => !f.isConsolidated);
 }
 
 export async function refreshCombinerAvailableFiles() {
@@ -132,12 +166,13 @@ export async function refreshCombinerAvailableFiles() {
         folder: f.folder,
         size: f.size,
         pages: pages,
-        year: year
+        year: year,
+        isConsolidated: Boolean(f.is_consolidated)
       };
     });
 
     if (sourceSummary) {
-      sourceSummary.textContent = `${files.length} converted`;
+      sourceSummary.textContent = `${combinableFiles().length} converted`;
     }
 
     // Discover all unique folder names
@@ -311,7 +346,7 @@ function selectCombinerFolderDocs() {
   }
 
   if (targetFolderSelect) targetFolderSelect.value = sourceFolder;
-  appState.combiner.selectedItems = appState.combiner.availableFiles.filter(f => f.folder === sourceFolder);
+  appState.combiner.selectedItems = combinableFiles().filter(f => f.folder === sourceFolder);
   sortCombinerItems("chronological_asc", false);
   renderCombinerFileList();
   autoSuggestCombinerTitleAndFilename();
@@ -322,9 +357,9 @@ function selectCombinerFolderDocs() {
 function selectCombinerAllDocs() {
   const sourceFolder = appState.combiner.sourceFolder || "ALL";
   if (sourceFolder === "ALL") {
-    appState.combiner.selectedItems = [...appState.combiner.availableFiles];
+    appState.combiner.selectedItems = [...combinableFiles()];
   } else {
-    appState.combiner.selectedItems = appState.combiner.availableFiles.filter(f => f.folder === sourceFolder);
+    appState.combiner.selectedItems = combinableFiles().filter(f => f.folder === sourceFolder);
   }
   sortCombinerItems("chronological_asc", false);
   renderCombinerFileList();
@@ -413,8 +448,8 @@ export function renderCombinerFileList() {
   const query = (searchInput && searchInput.value.trim().toLowerCase()) || "";
 
   let filteredAvailableFiles = (sourceFolder === "ALL")
-    ? appState.combiner.availableFiles
-    : appState.combiner.availableFiles.filter(f => f.folder === sourceFolder);
+    ? combinableFiles()
+    : combinableFiles().filter(f => f.folder === sourceFolder);
 
   if (query) {
     filteredAvailableFiles = filteredAvailableFiles.filter(f => 
@@ -449,7 +484,7 @@ export function renderCombinerFileList() {
         <p class="text-sm text-muted">${pdfCount > 0 ? `Contains ${pdfCount} PDFs that need OCR conversion.` : (query ? 'Try a different search term.' : 'No converted documents in this folder.')}</p>
         <div style="display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 10px;">
           ${pdfCount > 0 && !query ? `<button class="btn btn-sm btn-primary btn-convert-folder-now">🚀 Convert Folder (${pdfCount})</button>` : ''}
-          <button class="btn btn-sm btn-secondary btn-switch-all-now">📁 View All Converted (${appState.combiner.availableFiles.length})</button>
+          <button class="btn btn-sm btn-secondary btn-switch-all-now">View all converted (${combinableFiles().length})</button>
         </div>
       </div>
     `;
@@ -524,7 +559,7 @@ export function renderCombinerFileList() {
           <span>${doc.pages} pgs</span>
           <span>•</span>
           <span>${sizeKb} KB</span>
-          ${sourceFolder === "ALL" ? `<span>•</span><span>📁 ${doc.folder}</span>` : ""}
+          ${sourceFolder === "ALL" ? `<span>•</span><span class="combiner-item-folder">${doc.folder}</span>` : ""}
         </div>
       </div>
       ${doc.isSelected ? `<button class="btn-icon btn-remove" title="Exclude file" style="font-size: 18px; padding: 4px 8px; line-height: 1; flex-shrink: 0;">&times;</button>` : ""}
@@ -634,22 +669,73 @@ function triggerCombinerPreviewDebounced() {
 let combinerTranscript = null;
 
 /**
- * How much of a large selection the preview actually assembles.
+ * How much of a large selection the preview assembles up front.
  *
  * This tool exists because a browser could not do this work: consolidating a
  * whole workspace is 43MB of Markdown, and asking the browser to fetch it,
  * hold it as a string, split it and lay it out is the same mistake in a
- * different place. So the preview asks the server for the opening documents
- * only. Saving still sends every selected file, because saving is the server's
- * job and it streams to disk rather than into a tab.
+ * different place. So the preview shows the opening documents, immediately,
+ * whatever is selected — and building the whole thing is a deliberate act.
  *
- * The page limit is a second guard for the case one document is enormous on its
+ * The page limit is a second guard for one document that is enormous on its
  * own: every page reserves its estimated height even unrendered, and browsers
  * cap an element at about 33.5 million pixels. Past that, scroll positions stop
  * mapping to pages and the pane goes blank rather than slow.
  */
 const PREVIEW_DOCUMENT_LIMIT = 10;
 const PREVIEW_PAGE_LIMIT = 2000;
+
+/** Blank the counts, which only mean anything once something has been built. */
+function resetCombinerStats() {
+  ["studioCombinerStatDocs", "studioCombinerStatPages", "studioCombinerStatWords", "studioCombinerStatChars"]
+    .forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = "0";
+    });
+  const raw = document.getElementById("studioCombinerRawMarkdownTextarea");
+  if (raw) raw.value = "";
+}
+
+/**
+ * Say what the pane is showing, and offer the way to see the rest.
+ *
+ * The offer lives here rather than as a separate screen because the extract is
+ * genuinely useful on its own — it is how you check the ordering and the
+ * headers look right — and interrupting that with a wall was the wrong way
+ * round.
+ */
+function renderPreviewNotice(notice, { previewedDocuments, totalDocuments, totalPages }) {
+  if (!notice) return;
+
+  const partialDocs = totalDocuments > previewedDocuments;
+  const partialPages = totalPages > PREVIEW_PAGE_LIMIT;
+
+  if (!partialDocs && !partialPages) {
+    notice.style.display = "none";
+    notice.innerHTML = "";
+    return;
+  }
+
+  const parts = [];
+  if (partialDocs) {
+    parts.push(
+      `Showing the first ${previewedDocuments.toLocaleString()} of ${totalDocuments.toLocaleString()} documents`
+    );
+  }
+  if (partialPages) {
+    parts.push(`${PREVIEW_PAGE_LIMIT.toLocaleString()} of ${totalPages.toLocaleString()} pages`);
+  }
+
+  notice.style.display = "flex";
+  notice.innerHTML = `
+    <span>${parts.join(", ")}.</span>
+    ${partialDocs ? `<button class="btn btn-xs btn-primary" id="studioCombinerBuildFullBtn">Build full document</button>` : ""}
+  `;
+
+  document
+    .getElementById("studioCombinerBuildFullBtn")
+    ?.addEventListener("click", () => generateCombinerPreview({ full: true }));
+}
 
 function renderCombinerPreviewBody(markdown, { previewedDocuments = 0, totalDocuments = 0 } = {}) {
   const pane = document.getElementById("studioCombinerTabRendered");
@@ -670,19 +756,7 @@ function renderCombinerPreviewBody(markdown, { previewedDocuments = 0, totalDocu
     for (let page = 1; page <= PREVIEW_PAGE_LIMIT; page++) shown[page] = pages[page];
   }
 
-  if (notice) {
-    const messages = [];
-    if (totalDocuments > previewedDocuments) {
-      messages.push(
-        `Previewing the first ${previewedDocuments.toLocaleString()} of ${totalDocuments.toLocaleString()} documents`
-      );
-    }
-    if (total > PREVIEW_PAGE_LIMIT) {
-      messages.push(`showing ${PREVIEW_PAGE_LIMIT.toLocaleString()} of ${total.toLocaleString()} pages`);
-    }
-    notice.style.display = messages.length ? "block" : "none";
-    notice.textContent = messages.length ? `${messages.join(", ")}. Saving writes all of them.` : "";
-  }
+  renderPreviewNotice(notice, { previewedDocuments, totalDocuments, totalPages: total });
 
   combinerTranscript.setDocument(shown, { pageLabels: labels });
 }
@@ -700,59 +774,32 @@ function clearCombinerPreviewBody(html) {
 }
 
 /**
- * Above this many documents the preview is offered rather than run.
- *
- * "Select Entity" with every folder chosen selects the whole workspace — 397
- * documents and 19,000 pages here — and the preview then fetched a 43MB
- * consolidation nobody had asked for, on a 250ms debounce, while the user was
- * still deciding what they wanted. Choosing documents should not commit you to
- * assembling them.
+ * Copy and Download hand over whatever is in the raw pane, so while that is an
+ * extract they would quietly give you ten documents instead of four hundred.
+ * They are held until the full document exists. Save to Workspace is not: it
+ * sends the file list and the server assembles and writes it, which is the
+ * whole point of it being the server's job.
  */
-const AUTO_PREVIEW_DOC_LIMIT = 25;
-
-/** Blank the counts, which only mean anything once a preview has been built. */
-function resetCombinerStats() {
-  const zeros = {
-    studioCombinerStatDocs: "0",
-    studioCombinerStatPages: "0",
-    studioCombinerStatWords: "0",
-    studioCombinerStatChars: "0"
-  };
-  Object.entries(zeros).forEach(([id, value]) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = value;
+function updateCombinerOutputButtons() {
+  const partial = Boolean(appState.combiner.previewIsPartial);
+  [
+    document.getElementById("studioCombinerCopyBtn"),
+    document.getElementById("studioCombinerDownloadBtn")
+  ].forEach((btn) => {
+    if (!btn) return;
+    btn.disabled = partial;
+    btn.title = partial
+      ? "Build the full document first — the preview is only an extract"
+      : "";
   });
-  const raw = document.getElementById("studioCombinerRawMarkdownTextarea");
-  if (raw) raw.value = "";
-}
-
-/** Offer the preview instead of running it, for a selection this large. */
-function renderPreviewOffer(documentCount) {
-  const pages = appState.combiner.selectedItems.reduce((total, item) => total + (item.pages || 0), 0);
-
-  clearCombinerPreviewBody(`
-    <div style="padding: 56px 20px; text-align: center;">
-      <h3 style="font-size: 17px; font-weight: 600; color: var(--text-main);">
-        ${documentCount.toLocaleString()} documents selected
-      </h3>
-      <p class="text-muted" style="margin: 8px auto 18px; font-size: 14px; max-width: 420px;">
-        That is roughly ${pages.toLocaleString()} pages. Building the preview takes a moment,
-        so it waits for you to ask.
-      </p>
-      <button class="btn btn-primary" id="studioCombinerPreviewNowBtn">Build preview</button>
-    </div>
-  `);
-
-  document
-    .getElementById("studioCombinerPreviewNowBtn")
-    ?.addEventListener("click", () => generateCombinerPreview({ force: true }));
 }
 
 /**
- * @param {{force?: boolean}} options — `force` builds the preview however large
- *   the selection is, and is what the offer button passes.
+ * @param {{full?: boolean}} options — `full` assembles every selected document
+ *   rather than the opening extract, which is what "Build full document" asks
+ *   for and what Copy and Download need before they mean anything.
  */
-export async function generateCombinerPreview({ force = false } = {}) {
+export async function generateCombinerPreview({ full = false } = {}) {
   const rawTextarea = document.getElementById("studioCombinerRawMarkdownTextarea");
   const statDocs = document.getElementById("studioCombinerStatDocs");
   const statPages = document.getElementById("studioCombinerStatPages");
@@ -780,30 +827,25 @@ export async function generateCombinerPreview({ force = false } = {}) {
           </p>
         </div>
     `);
-    if (rawTextarea) rawTextarea.value = "";
-    if (statDocs) statDocs.textContent = "0";
-    if (statPages) statPages.textContent = "0";
-    if (statWords) statWords.textContent = "0";
-    if (statChars) statChars.textContent = "0";
-    return;
-  }
-
-  if (!force && selected.length > AUTO_PREVIEW_DOC_LIMIT) {
-    renderPreviewOffer(selected.length);
+    appState.combiner.previewIsPartial = false;
+    updateCombinerOutputButtons();
     resetCombinerStats();
     return;
   }
 
-  // Only the opening documents are assembled for the preview. The rest are
-  // still selected, still listed, and still saved — they are simply not fetched
-  // into the tab to be looked at.
-  const previewFiles = selected.slice(0, PREVIEW_DOCUMENT_LIMIT);
+  // Unless the whole thing was asked for, assemble only the opening documents.
+  // The rest stay selected, listed and saved — they are simply not fetched into
+  // the tab in order to be glanced at.
+  const previewFiles = full ? selected : selected.slice(0, PREVIEW_DOCUMENT_LIMIT);
   const previewIsPartial = previewFiles.length < selected.length;
+  appState.combiner.previewIsPartial = previewIsPartial;
+  updateCombinerOutputButtons();
 
   clearCombinerPreviewBody(`
     <div class="text-muted text-center" style="padding: 60px; font-size: 15px;">
       <span class="spinner" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 8px;"></span>
-      Assembling ${previewFiles.length.toLocaleString()} ${previewFiles.length === 1 ? "document" : "documents"}…
+      ${full ? "Building the full document" : "Preparing a preview"} —
+      ${previewFiles.length.toLocaleString()} ${previewFiles.length === 1 ? "document" : "documents"}…
     </div>
   `);
 

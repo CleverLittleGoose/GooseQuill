@@ -6,6 +6,7 @@ from ..models.pricing import CostEstimate, PricingRegistry
 from .pdf_renderer import PDFRenderer
 from .cache_manager import CacheManager
 from .cost_calculator import CostCalculator
+from .search_service import CONSOLIDATED_DIR_NAME, is_consolidated
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +131,14 @@ class DocumentRepository:
 
         # 2. Discover all subdirectories
         for folder in sorted(root.iterdir()):
-            if folder.is_dir() and not folder.name.startswith(".") and folder.name != "Markdown":
+            # "Markdown" holds transcripts and "Consolidated" holds combiner
+            # output; neither is an entity, and both would otherwise appear in
+            # the sidebar as a folder containing no filings.
+            if (
+                folder.is_dir()
+                and not folder.name.startswith(".")
+                and folder.name not in ("Markdown", CONSOLIDATED_DIR_NAME)
+            ):
                 pdf_list = []
                 for pdf_file in sorted(folder.glob("*.pdf")):
                     doc_info = self.get_document_info(pdf_file, model_name, active_batch_map)
@@ -172,7 +180,15 @@ class DocumentRepository:
         return new_path
 
     def get_converted_markdowns(self, root_dir: Path) -> List[Dict[str, Any]]:
-        """Discover all converted markdown files across all folders in a root directory."""
+        """Discover all converted markdown files across all folders in a root directory.
+
+        Consolidated output is included but flagged, rather than filtered out
+        here. Combining consolidations is a legitimate thing to want to do
+        occasionally — it is only a poor default, because a consolidation of a
+        folder contains every document in that folder, so sweeping it back in
+        duplicates the lot and grows the file every time it is rebuilt. The
+        caller decides; this just says which is which.
+        """
         root = Path(root_dir)
         results: List[Dict[str, Any]] = []
         if not root.exists():
@@ -195,7 +211,8 @@ class DocumentRepository:
                 "stem": item.stem,
                 "path": str(item),
                 "folder": folder,
-                "size": item.stat().st_size
+                "size": item.stat().st_size,
+                "is_consolidated": is_consolidated(item),
             })
         return results
 

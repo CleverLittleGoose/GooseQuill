@@ -36,6 +36,7 @@ from goosequill.services import (
     PricingSyncService,
     SearchService
 )
+from goosequill.services.search_service import CONSOLIDATED_DIR_NAME, is_consolidated
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("app")
@@ -568,6 +569,8 @@ def search_documents(
     whole_word: bool = False,
     max_documents: int = 100,
     max_matches_per_document: int = 5,
+    offset: int = 0,
+    include_consolidated: bool = False,
 ):
     """Search the text of every converted document in the workspace."""
     if len(q or "") > 500:
@@ -579,6 +582,8 @@ def search_documents(
         whole_word=whole_word,
         max_documents=max(1, min(max_documents, 500)),
         max_matches_per_document=max(1, min(max_matches_per_document, 25)),
+        offset=max(0, offset),
+        include_consolidated=include_consolidated,
     )
 
 
@@ -612,13 +617,20 @@ def combine_markdown(req: CombineMarkdownRequest):
             if not filename.lower().endswith(".md"):
                 filename += ".md"
 
+            # Consolidated output goes to its own directory rather than in
+            # among the transcripts. Written beside them, a consolidation was
+            # indistinguishable from a converted document: it counted towards
+            # "converted", it appeared in the list of things to consolidate, and
+            # its text — which is a copy of text already in the workspace —
+            # matched every search twice. Combining a folder then swept up
+            # yesterday's combination of that folder, and the file grew each
+            # time it was made.
             if req.target_folder and req.target_folder not in ("Root", "General / Root", "All Folders"):
                 folder = _safe_component(req.target_folder, "Target folder")
-                dest_dir = BASE_ACCOUNTS_DIR / folder / "Markdown"
-                if not dest_dir.exists():
-                    dest_dir = BASE_ACCOUNTS_DIR / folder
+                dest_dir = BASE_ACCOUNTS_DIR / folder / CONSOLIDATED_DIR_NAME
             else:
-                dest_dir = BASE_ACCOUNTS_DIR
+                dest_dir = BASE_ACCOUNTS_DIR / CONSOLIDATED_DIR_NAME
+            dest_dir.mkdir(parents=True, exist_ok=True)
 
             target_path = dest_dir / filename
             saved_p = MarkdownCombinerService.save_combined_document(target_path, result["content"])
