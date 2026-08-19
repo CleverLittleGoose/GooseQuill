@@ -66,12 +66,6 @@ class PDFRenderer:
                 doc.close()
 
     @staticmethod
-    def render_page_image(doc: pdfium.PdfDocument, page_idx: int, dpi: int = 200) -> bytes:
-        """Render a single page from an already-open document to PNG bytes."""
-        with _PDFIUM_LOCK:
-            return PDFRenderer._to_png_bytes(doc[page_idx], dpi)
-
-    @staticmethod
     def render_page_from_path(pdf_path: Path, page_num: int, dpi: int = 200) -> bytes:
         """Render a single 1-indexed page from a PDF file path."""
         with _PDFIUM_LOCK:

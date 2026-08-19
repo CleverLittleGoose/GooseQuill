@@ -39,7 +39,7 @@ test("matching is case insensitive", () => {
 });
 
 test("a partial word matches", () => {
-  assert.deepEqual(paths("london 2026"), ["b"]);
+  assert.deepEqual(paths("north 2026"), ["b"]);
 });
 
 test("an entity match outranks the same word buried in a filename", () => {
@@ -47,7 +47,7 @@ test("an entity match outranks the same word buried in a filename", () => {
     { folder: "Holdings Ltd", name: "Report about Kingsmere Resort.pdf", path: "buried" },
     { folder: "Kingsmere Resort Operations Limited", name: "Mortgage or Charge 1.pdf", path: "entity" }
   ];
-  assert.equal(rankDocuments(mixed, "alton")[0].path, "entity");
+  assert.equal(rankDocuments(mixed, "kingsmere")[0].path, "entity");
 });
 
 test("nothing matching gives an empty list rather than everything", () => {

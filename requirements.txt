@@ -7,4 +7,3 @@ uvicorn>=0.30.0
 tqdm>=4.66.0
 python-multipart>=0.0.9
 requests>=2.31.0
-pytest>=8.0.0
