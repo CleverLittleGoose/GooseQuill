@@ -6,10 +6,10 @@
 import { appState, eventBus } from "./js/state.js";
 import { updateNotificationUI } from "./js/services/notifications.js";
 import { checkJobStatus } from "./js/services/job_poller.js";
-import { initHeader, testApiConnection } from "./js/components/header.js";
+import { initHeader, testApiConnection, watchNavOverflow } from "./js/components/header.js";
 import { initFolderSidebar, renderSidebarFolders, renderStats } from "./js/components/folder_sidebar.js";
 import { initDocumentTable, renderDocuments, updateSelectedUI } from "./js/components/document_table.js";
-import { initViewerModal } from "./js/components/viewer_modal.js";
+import { initStudio } from "./js/studio/index.js";
 import { initSearchView } from "./js/components/search_view.js";
 import { initCombinerModal, refreshCombinerAvailableFiles } from "./js/components/combiner_modal.js";
 import { initBatchModal, fetchBatchJobs } from "./js/components/batch_modal.js";
@@ -68,7 +68,8 @@ async function init() {
   initHeader();
   initFolderSidebar();
   initDocumentTable();
-  initViewerModal();
+  initStudio();
+  watchNavOverflow();
   initSearchView();
   initCombinerModal();
   initBatchModal();
