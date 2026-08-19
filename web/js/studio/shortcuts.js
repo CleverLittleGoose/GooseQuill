@@ -12,6 +12,7 @@
  *   n / p               next / previous change, while diff is on
  *   ← / → PgUp / PgDn   previous / next page
  *   Escape              close the find bar
+ *   ?                   show this list
  *
  * Every binding is guarded on focus: a shortcut that fires while the caret is
  * in a field is a shortcut that corrupts the text someone was typing.
@@ -26,10 +27,27 @@ import { openSearchBar, closeSearchBar } from "./search.js";
 import { goToChangedPage } from "./diff.js";
 import { stepTab } from "./document.js";
 import { openDocumentSwitcher, isSwitcherOpen } from "./switcher.js";
+import { toggleShortcutsHelp, isShortcutsHelpOpen, closeShortcutsHelp } from "./shortcuts_help.js";
 
 export function initStudioShortcuts() {
   window.addEventListener("keydown", (event) => {
     const mod = event.metaKey || event.ctrlKey;
+
+    // "?" works from anywhere, because the moment you need the list is the
+    // moment you do not know where you are meant to be to ask for it.
+    if (event.key === "?" && !mod && !isTextEntryElement(document.activeElement)) {
+      event.preventDefault();
+      toggleShortcutsHelp();
+      return;
+    }
+
+    if (isShortcutsHelpOpen()) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeShortcutsHelp();
+      }
+      return;
+    }
 
     // The document switcher works from anywhere — it is how you get to a
     // document, so requiring you to already be looking at one is backwards.
