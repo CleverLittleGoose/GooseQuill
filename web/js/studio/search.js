@@ -228,10 +228,20 @@ function performRawSearch(query, matchCase, textarea) {
   }
 
   setNavEnabled(true);
-  activateRawMatch(0);
+  // Typing is not navigating. Taking focus here put the caret in the document
+  // after every keystroke, so the next letter was typed into the transcript
+  // instead of the find box — and in the raw editor that is an edit.
+  activateRawMatch(0, { takeFocus: false });
 }
 
-function activateRawMatch(index) {
+/**
+ * Show one raw-mode match.
+ *
+ * @param {{takeFocus?: boolean}} options — whether to move the caret into the
+ *   editor. True when the user asked to go to a match (Enter, or the arrows);
+ *   false when the list simply changed underneath them as they typed.
+ */
+function activateRawMatch(index, { takeFocus = true } = {}) {
   const textarea = dom.rawTextarea();
   const match = searchState.rawMatches[index];
   if (!textarea || !match) return;
@@ -239,11 +249,14 @@ function activateRawMatch(index) {
   searchState.currentIndex = index;
   setCount(`${index + 1} of ${searchState.rawMatches.length}`);
 
+  textarea.scrollTop = Math.max(0, measureTextareaOffsetTop(textarea, match.start) - textarea.clientHeight / 2);
+
+  if (!takeFocus) return;
+
   // Focus first: an unfocused textarea shows no selection, so the match would
   // be scrolled to but invisible.
   textarea.focus();
   textarea.setSelectionRange(match.start, match.end);
-  textarea.scrollTop = Math.max(0, measureTextareaOffsetTop(textarea, match.start) - textarea.clientHeight / 2);
 }
 
 /**
