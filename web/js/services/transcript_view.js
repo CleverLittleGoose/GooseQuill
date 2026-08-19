@@ -26,7 +26,10 @@ const RENDER_MARGIN_PX = 2000;
 // Rough px-per-character, used only until a page has been measured once.
 // Derived from real filings; being wrong just means the scrollbar settles
 // slightly as pages are visited.
-const ESTIMATED_PX_PER_CHAR = 0.8;
+// Deliberately a slight under-estimate. Measurement corrects it as soon as a
+// page renders, and content settling upwards reads far better than a page
+// followed by a screenful of nothing.
+const ESTIMATED_PX_PER_CHAR = 0.55;
 const MIN_ESTIMATED_PAGE_HEIGHT = 320;
 
 export class TranscriptView {
@@ -164,11 +167,18 @@ export class TranscriptView {
     this._decoratePageHeading(section, page);
     this.renderedPages.add(page);
 
-    // Once real content exists, pin the placeholder to its true height so
-    // releasing the page later cannot shift everything below it.
+    // Drop the placeholder height *before* measuring. Left in place, a page
+    // whose estimate ran high measures as its own estimate — offsetHeight can
+    // only report the larger of content and min-height — and that inflated
+    // number then gets pinned as if it were real. The result was a rendered
+    // page followed by a screen of empty space, permanently, because the
+    // estimate had been laundered into a measurement.
+    section.style.minHeight = "";
     const height = section.offsetHeight;
     if (height > 0) {
       this.measuredHeights.set(page, height);
+      // Now pin the true height, so releasing the page later cannot shift
+      // everything below it.
       section.style.minHeight = `${height}px`;
     }
 
