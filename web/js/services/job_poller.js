@@ -108,12 +108,16 @@ export async function checkJobStatus() {
   }
 }
 
+/** Ask the server to stop the running conversion. */
 export async function cancelConversion() {
   const cancelBtn = document.getElementById("cancelJobBtn");
   if (cancelBtn) cancelBtn.textContent = "Cancelling...";
   try {
-    await fetch("/api/cancel", { method: "POST" });
+    const res = await fetch("/api/cancel", { method: "POST" });
+    if (!res.ok) throw new Error(`Cancel failed (${res.status})`);
   } catch (e) {
     console.error("Cancel error:", e);
+    if (cancelBtn) cancelBtn.textContent = "Cancel Job";
+    showToast("Could not cancel", "The job is still running.", true);
   }
 }

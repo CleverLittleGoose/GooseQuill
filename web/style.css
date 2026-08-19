@@ -1424,12 +1424,6 @@ input[type="checkbox"]:focus-visible {
 .modal-sm { width: 480px; }
 .modal-md { width: 620px; }
 .modal-lg { width: 840px; }
-.modal-fullscreen {
-  width: 95vw;
-  height: 92vh;
-  max-height: 92vh;
-}
-
 .modal-header {
   padding: 18px 24px;
   border-bottom: 1px solid var(--border-color);
@@ -1865,55 +1859,8 @@ input[type="checkbox"]:focus-visible {
 }
 
 /* ==========================================================================
-   Document Viewer Split View Modal & PDF Canvas
+   Scan Pane Controls
    ========================================================================== */
-.viewer-body {
-  padding: 14px 18px;
-  overflow: hidden !important;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  height: 100%;
-}
-
-.viewer-split-container {
-  display: flex;
-  flex-direction: row;
-  gap: 16px;
-  flex: 1;
-  min-height: 0;
-  height: 100%;
-  width: 100%;
-}
-
-.viewer-pane {
-  flex: 1 1 50%;
-  min-width: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-}
-
-.viewer-pane.markdown-pane {
-  overflow-y: auto;
-  padding: 24px 30px;
-  background-color: var(--bg-surface);
-}
-
-.viewer-pane.markdown-pane .markdown-preview {
-  max-width: 100%;
-}
-
-.viewer-pane.pdf-pane {
-  background-color: var(--bg-app);
-}
-
 .pdf-controls-bar {
   display: flex;
   align-items: center;
@@ -1967,15 +1914,7 @@ input[type="checkbox"]:focus-visible {
   flex: 1;
 }
 
-/* Auto-Sync Button & Page Section Markers */
-#viewerAutoScrollBtn.active {
-  background-color: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
-  border-color: rgba(59, 130, 246, 0.5);
-  box-shadow: 0 0 8px rgba(59, 130, 246, 0.25);
-  font-weight: 600;
-}
-
+/* Page Section Markers */
 .doc-page-heading {
   scroll-margin-top: 16px;
   position: relative;
@@ -2010,12 +1949,6 @@ input[type="checkbox"]:focus-visible {
 /* ==========================================================================
    In-Viewer Document Search Toolbar & Highlighting
    ========================================================================== */
-#viewerSearchToggleBtn.active {
-  background-color: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
-  border-color: rgba(59, 130, 246, 0.5);
-}
-
 .viewer-search-bar {
   position: sticky;
   top: -12px;

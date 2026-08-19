@@ -4,10 +4,6 @@
 
 let notificationsEnabled = ("Notification" in window && Notification.permission === "granted");
 
-export function isNotificationEnabled() {
-  return notificationsEnabled;
-}
-
 export function updateNotificationUI() {
   const toggleBtn = document.getElementById("toggleNotificationsBtn");
   const notifText = document.getElementById("notifBtnText");

@@ -4,6 +4,7 @@
 
 import { appState, eventBus } from "../state.js";
 import { requestNotificationPermission, updateNotificationUI, showToast } from "../services/notifications.js";
+import { cancelConversion } from "../services/job_poller.js";
 import { startJobPolling, checkJobStatus } from "../services/job_poller.js";
 
 export function initHeader() {
@@ -70,12 +71,11 @@ export function initHeader() {
     apiAlertBanner.style.display = "block";
   });
 
-  // Cancel Job
+  // Cancel Job. The request itself lives in the job service, which is where
+  // the rest of the conversion lifecycle lives; this was a second copy of it
+  // that had drifted into swallowing failures silently.
   if (cancelJobBtn) {
-    cancelJobBtn.addEventListener("click", async () => {
-      cancelJobBtn.textContent = "Cancelling...";
-      await fetch("/api/cancel", { method: "POST" });
-    });
+    cancelJobBtn.addEventListener("click", () => cancelConversion());
   }
 
   eventBus.on("view:switch", (viewName) => switchStudioView(viewName));
