@@ -6,6 +6,8 @@
 import { appState, eventBus } from "../state.js";
 import { showToast } from "../services/notifications.js";
 import { markdownRenderer } from "../services/markdown_renderer.js";
+import { TranscriptView } from "../services/transcript_view.js";
+import { splitSequential } from "../services/page_splitter.js";
 import { startConversion } from "./header.js";
 import { switchStudioView } from "./header.js";
 
@@ -616,8 +618,141 @@ function triggerCombinerPreviewDebounced() {
   }, 250);
 }
 
-export async function generateCombinerPreview() {
-  const renderedContent = document.getElementById("studioCombinerRenderedContent");
+/**
+ * The consolidated preview, drawn a page at a time.
+ *
+ * This was the last render path still building one `innerHTML` for the whole
+ * document. Combining a handful of 200-page filings makes that string tens of
+ * megabytes of HTML, and the browser lays all of it out before showing
+ * anything — the exact stutter the Studio transcript used to have.
+ *
+ * `TranscriptView` already solves it, so the preview borrows it rather than
+ * growing its own copy. The one thing it cannot borrow is page numbering: a
+ * consolidated file restarts at page 1 for every source document, so blocks are
+ * keyed by position and labelled with the page they claim to be.
+ */
+let combinerTranscript = null;
+
+/**
+ * How much of a large selection the preview actually assembles.
+ *
+ * This tool exists because a browser could not do this work: consolidating a
+ * whole workspace is 43MB of Markdown, and asking the browser to fetch it,
+ * hold it as a string, split it and lay it out is the same mistake in a
+ * different place. So the preview asks the server for the opening documents
+ * only. Saving still sends every selected file, because saving is the server's
+ * job and it streams to disk rather than into a tab.
+ *
+ * The page limit is a second guard for the case one document is enormous on its
+ * own: every page reserves its estimated height even unrendered, and browsers
+ * cap an element at about 33.5 million pixels. Past that, scroll positions stop
+ * mapping to pages and the pane goes blank rather than slow.
+ */
+const PREVIEW_DOCUMENT_LIMIT = 10;
+const PREVIEW_PAGE_LIMIT = 2000;
+
+function renderCombinerPreviewBody(markdown, { previewedDocuments = 0, totalDocuments = 0 } = {}) {
+  const pane = document.getElementById("studioCombinerTabRendered");
+  const content = document.getElementById("studioCombinerRenderedContent");
+  const notice = document.getElementById("studioCombinerPreviewNotice");
+  if (!pane || !content) return;
+
+  if (!combinerTranscript) {
+    combinerTranscript = new TranscriptView(pane, content, {});
+  }
+
+  const { pages, labels } = splitSequential(markdown);
+  const total = Object.keys(pages).filter((key) => /^\d+$/.test(key)).length;
+
+  let shown = pages;
+  if (total > PREVIEW_PAGE_LIMIT) {
+    shown = { preamble: pages.preamble };
+    for (let page = 1; page <= PREVIEW_PAGE_LIMIT; page++) shown[page] = pages[page];
+  }
+
+  if (notice) {
+    const messages = [];
+    if (totalDocuments > previewedDocuments) {
+      messages.push(
+        `Previewing the first ${previewedDocuments.toLocaleString()} of ${totalDocuments.toLocaleString()} documents`
+      );
+    }
+    if (total > PREVIEW_PAGE_LIMIT) {
+      messages.push(`showing ${PREVIEW_PAGE_LIMIT.toLocaleString()} of ${total.toLocaleString()} pages`);
+    }
+    notice.style.display = messages.length ? "block" : "none";
+    notice.textContent = messages.length ? `${messages.join(", ")}. Saving writes all of them.` : "";
+  }
+
+  combinerTranscript.setDocument(shown, { pageLabels: labels });
+}
+
+/** Drop the virtualised preview back to a plain message. */
+function clearCombinerPreviewBody(html) {
+  const content = document.getElementById("studioCombinerRenderedContent");
+  const notice = document.getElementById("studioCombinerPreviewNotice");
+  if (notice) notice.style.display = "none";
+  if (combinerTranscript) {
+    combinerTranscript.destroy();
+    combinerTranscript = null;
+  }
+  if (content) content.innerHTML = html;
+}
+
+/**
+ * Above this many documents the preview is offered rather than run.
+ *
+ * "Select Entity" with every folder chosen selects the whole workspace — 397
+ * documents and 19,000 pages here — and the preview then fetched a 43MB
+ * consolidation nobody had asked for, on a 250ms debounce, while the user was
+ * still deciding what they wanted. Choosing documents should not commit you to
+ * assembling them.
+ */
+const AUTO_PREVIEW_DOC_LIMIT = 25;
+
+/** Blank the counts, which only mean anything once a preview has been built. */
+function resetCombinerStats() {
+  const zeros = {
+    studioCombinerStatDocs: "0",
+    studioCombinerStatPages: "0",
+    studioCombinerStatWords: "0",
+    studioCombinerStatChars: "0"
+  };
+  Object.entries(zeros).forEach(([id, value]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  });
+  const raw = document.getElementById("studioCombinerRawMarkdownTextarea");
+  if (raw) raw.value = "";
+}
+
+/** Offer the preview instead of running it, for a selection this large. */
+function renderPreviewOffer(documentCount) {
+  const pages = appState.combiner.selectedItems.reduce((total, item) => total + (item.pages || 0), 0);
+
+  clearCombinerPreviewBody(`
+    <div style="padding: 56px 20px; text-align: center;">
+      <h3 style="font-size: 17px; font-weight: 600; color: var(--text-main);">
+        ${documentCount.toLocaleString()} documents selected
+      </h3>
+      <p class="text-muted" style="margin: 8px auto 18px; font-size: 14px; max-width: 420px;">
+        That is roughly ${pages.toLocaleString()} pages. Building the preview takes a moment,
+        so it waits for you to ask.
+      </p>
+      <button class="btn btn-primary" id="studioCombinerPreviewNowBtn">Build preview</button>
+    </div>
+  `);
+
+  document
+    .getElementById("studioCombinerPreviewNowBtn")
+    ?.addEventListener("click", () => generateCombinerPreview({ force: true }));
+}
+
+/**
+ * @param {{force?: boolean}} options — `force` builds the preview however large
+ *   the selection is, and is what the offer button passes.
+ */
+export async function generateCombinerPreview({ force = false } = {}) {
   const rawTextarea = document.getElementById("studioCombinerRawMarkdownTextarea");
   const statDocs = document.getElementById("studioCombinerStatDocs");
   const statPages = document.getElementById("studioCombinerStatPages");
@@ -633,8 +768,7 @@ export async function generateCombinerPreview() {
 
   const selected = appState.combiner.selectedItems;
   if (selected.length === 0) {
-    if (renderedContent) {
-      renderedContent.innerHTML = `
+    clearCombinerPreviewBody(`
         <div style="padding: 60px 20px; text-align: center;">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 14px; opacity: 0.35;">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -645,8 +779,7 @@ export async function generateCombinerPreview() {
             Select documents on the left to sequence them, or click "Select Entity" to consolidate an entire folder.
           </p>
         </div>
-      `;
-    }
+    `);
     if (rawTextarea) rawTextarea.value = "";
     if (statDocs) statDocs.textContent = "0";
     if (statPages) statPages.textContent = "0";
@@ -655,16 +788,31 @@ export async function generateCombinerPreview() {
     return;
   }
 
-  if (renderedContent) {
-    renderedContent.innerHTML = `<div class="text-muted text-center" style="padding: 60px; font-size: 15px;"><span class="spinner" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 8px;"></span>Generating live consolidated markdown preview...</div>`;
+  if (!force && selected.length > AUTO_PREVIEW_DOC_LIMIT) {
+    renderPreviewOffer(selected.length);
+    resetCombinerStats();
+    return;
   }
+
+  // Only the opening documents are assembled for the preview. The rest are
+  // still selected, still listed, and still saved — they are simply not fetched
+  // into the tab to be looked at.
+  const previewFiles = selected.slice(0, PREVIEW_DOCUMENT_LIMIT);
+  const previewIsPartial = previewFiles.length < selected.length;
+
+  clearCombinerPreviewBody(`
+    <div class="text-muted text-center" style="padding: 60px; font-size: 15px;">
+      <span class="spinner" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 8px;"></span>
+      Assembling ${previewFiles.length.toLocaleString()} ${previewFiles.length === 1 ? "document" : "documents"}…
+    </div>
+  `);
 
   try {
     const res = await fetch("/api/combine_markdown", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        files: selected.map(s => s.path),
+        files: previewFiles.map(s => s.path),
         master_title: (masterTitleInput && masterTitleInput.value.trim()) || undefined,
         output_filename: (outputFilenameInput && outputFilenameInput.value.trim()) || undefined,
         target_folder: (targetFolderSelect && targetFolderSelect.value) || undefined,
@@ -681,18 +829,31 @@ export async function generateCombinerPreview() {
 
     appState.combiner.cachedResult = data;
 
-    if (renderedContent) renderedContent.innerHTML = markdownRenderer.render(data.content);
+    renderCombinerPreviewBody(data.content, {
+      previewedDocuments: previewFiles.length,
+      totalDocuments: selected.length
+    });
     if (rawTextarea) rawTextarea.value = data.content;
 
-    if (statDocs) statDocs.textContent = data.total_documents;
-    if (statPages) statPages.textContent = data.total_pages;
-    if (statWords) statWords.textContent = data.total_words.toLocaleString();
-    if (statChars) statChars.textContent = data.total_chars.toLocaleString();
+    if (previewIsPartial) {
+      // The counts describe what will be saved, not what was assembled to look
+      // at. Pages we know from the selection; words and characters we would
+      // have to build the whole document to learn, which is the thing being
+      // avoided, so they are left blank rather than quietly understated.
+      const selectedPages = selected.reduce((total, item) => total + (item.pages || 0), 0);
+      if (statDocs) statDocs.textContent = selected.length.toLocaleString();
+      if (statPages) statPages.textContent = selectedPages.toLocaleString();
+      if (statWords) statWords.textContent = "—";
+      if (statChars) statChars.textContent = "—";
+    } else {
+      if (statDocs) statDocs.textContent = data.total_documents;
+      if (statPages) statPages.textContent = data.total_pages;
+      if (statWords) statWords.textContent = data.total_words.toLocaleString();
+      if (statChars) statChars.textContent = data.total_chars.toLocaleString();
+    }
 
   } catch (e) {
-    if (renderedContent) {
-      renderedContent.innerHTML = `<div class="text-danger text-center" style="padding: 40px; font-size: 15px;">Error generating preview: ${e.message}</div>`;
-    }
+    clearCombinerPreviewBody(`<div class="text-danger text-center" style="padding: 40px; font-size: 15px;">Error generating preview: ${e.message}</div>`);
   }
 }
 

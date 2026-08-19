@@ -67,7 +67,7 @@ export class TranscriptView {
   /**
    * Swap in a document. `pagesMap` is {pageNumber: markdownForThatPage}.
    */
-  setDocument(pagesMap, { restrictToPage = null, renderPage = null } = {}) {
+  setDocument(pagesMap, { restrictToPage = null, renderPage = null, pageLabels = null } = {}) {
     this._cancelIndexing();
     this.observer.disconnect();
 
@@ -75,6 +75,10 @@ export class TranscriptView {
     // Lets a caller supply its own HTML per page — diff mode renders annotated
     // pages this way and inherits the windowing for free.
     this.renderPage = renderPage;
+    // Keys are positions, not always page numbers. A consolidated document
+    // restarts at page 1 for every source file, so it keys blocks by position
+    // and says here what each block should actually be called.
+    this.pageLabels = pageLabels;
     this.pageNumbers = Object.keys(this.pagesMap)
       .filter((key) => /^\d+$/.test(key))   // skips the "preamble" entry
       .map((n) => parseInt(n, 10))
@@ -199,6 +203,11 @@ export class TranscriptView {
     this.renderedPages.delete(page);
   }
 
+  /** What this block calls itself, which is not always its key. */
+  _pageLabel(page) {
+    return this.pageLabels ? this.pageLabels[page] ?? String(page) : String(page);
+  }
+
   /** Give the page's own heading its badge, as the flat renderer used to. */
   _decoratePageHeading(section, page) {
     const heading = section.querySelector("h1, h2, h3, h4, h5, h6");
@@ -208,7 +217,7 @@ export class TranscriptView {
       if (!section.querySelector(".doc-page-badge")) {
         const standalone = document.createElement("div");
         standalone.className = "doc-page-heading tv-page-marker";
-        standalone.innerHTML = `<span class="doc-page-badge">PAGE ${page}</span>`;
+        standalone.innerHTML = `<span class="doc-page-badge">PAGE ${this._pageLabel(page)}</span>`;
         section.insertBefore(standalone, section.firstChild);
       }
       return;
@@ -217,7 +226,7 @@ export class TranscriptView {
     heading.classList.add("doc-page-heading");
     const badge = document.createElement("span");
     badge.className = "doc-page-badge";
-    badge.textContent = `PAGE ${page}`;
+    badge.textContent = `PAGE ${this._pageLabel(page)}`;
     heading.appendChild(badge);
   }
 
