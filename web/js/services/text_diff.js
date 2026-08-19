@@ -32,7 +32,7 @@ export function normalise(text) {
  *
  * @returns {{changedPages:number[], onlyInA:number[], onlyInB:number[], sharedPages:number[]}}
  */
-export function comparePageSets(pagesA, pagesB) {
+export function comparePageSets(pagesA, pagesB, { mode = "source" } = {}) {
   const numbersA = pageNumbersOf(pagesA);
   const numbersB = pageNumbersOf(pagesB);
   const setB = new Set(numbersB);
@@ -45,7 +45,9 @@ export function comparePageSets(pagesA, pagesB) {
   numbersA.forEach((page) => {
     if (!setB.has(page)) return;
     sharedPages.push(page);
-    if (normalise(pagesA[page]) !== normalise(pagesB[page])) changedPages.push(page);
+    if (comparableText(pagesA[page], mode) !== comparableText(pagesB[page], mode)) {
+      changedPages.push(page);
+    }
   });
 
   return { changedPages, onlyInA, onlyInB, sharedPages };
@@ -206,9 +208,9 @@ function mergeAdjacent(ops) {
  *
  * @returns {{aHtml:string, bHtml:string, changed:boolean, added:number, removed:number}}
  */
-export function diffPageHtml(markdownA, markdownB) {
-  const textA = stripPageHeading(markdownA);
-  const textB = stripPageHeading(markdownB);
+export function diffPageHtml(markdownA, markdownB, { mode = "source" } = {}) {
+  const textA = forMode(markdownA, mode);
+  const textB = forMode(markdownB, mode);
 
   if (normalise(textA) === normalise(textB)) {
     const unchanged = `<div class="diff-body diff-unchanged">${escapeHtml(textA)}</div>`;
@@ -247,6 +249,91 @@ export function diffPageHtml(markdownA, markdownB) {
 
 function countWords(tokens) {
   return tokens.filter((t) => /\S/.test(t)).length;
+}
+
+/* ==========================================================================
+   COMPARISON MODES
+
+   The same page pair can be compared two ways, and which one is right depends
+   on what you are looking for rather than on anything we can decide here.
+
+   "source" compares the Markdown as written. A changed table row, a heading
+   that moved, a figure that gained a footnote marker — all of it shows up,
+   which is what you want when the two documents are two years of the same
+   filing. It reads noisier, because `## At a glance` and `| Assets | WAULT |`
+   appear as literal text.
+
+   "prose" compares the words the document renders to. Formatting is stripped
+   first, so the comparison reads like the document does — at the cost of being
+   blind to structural edits, since a table rewritten as a list can come out
+   word-identical.
+   ========================================================================== */
+
+/** Prepare one page's Markdown for comparison under the chosen mode. */
+export function forMode(markdown, mode = "source") {
+  const text = stripPageHeading(markdown);
+  return mode === "prose" ? markdownToProse(text) : text;
+}
+
+/** Normalised text used only to decide whether a page changed at all. */
+function comparableText(markdown, mode) {
+  return normalise(forMode(markdown, mode));
+}
+
+/**
+ * Reduce Markdown to the prose it renders to.
+ *
+ * Deliberately a text transform rather than a render-then-read-back: pulling
+ * text out of rendered HTML would mean building a DOM per page, and the diff
+ * runs over pages that were never displayed.
+ */
+export function markdownToProse(markdown) {
+  let text = String(markdown || "");
+
+  // Comments and the assembler's own markers carry nothing to read.
+  text = text.replace(/<!--[\s\S]*?-->/g, "");
+
+  // Fenced code keeps its contents but loses the fence.
+  text = text.replace(/^[ \t]*```[^\n]*\n?/gm, "");
+
+  // Images have no prose; their alt text is the nearest thing to it.
+  text = text.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1");
+  // Links read as their label.
+  text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+
+  text = text
+    // Headings: the words, not the level.
+    .replace(/^[ \t]*#{1,6}[ \t]+/gm, "")
+    // Blockquotes and list markers.
+    .replace(/^[ \t]*>[ \t]?/gm, "")
+    .replace(/^[ \t]*[-*+][ \t]+/gm, "")
+    .replace(/^[ \t]*\d+[.)][ \t]+/gm, "")
+    // Horizontal rules are not words.
+    .replace(/^[ \t]*(?:-{3,}|\*{3,}|_{3,})[ \t]*$/gm, "");
+
+  // Table separator rows are pure formatting; drop them, and read the cells of
+  // every other row as a sentence so a changed figure still lines up with the
+  // heading it sits under.
+  text = text
+    .split("\n")
+    .filter((line) => !/^[ \t]*\|?[ \t]*:?-{2,}:?[ \t]*(\|[ \t]*:?-{2,}:?[ \t]*)*\|?[ \t]*$/.test(line))
+    .map((line) =>
+      /^[ \t]*\|.*\|[ \t]*$/.test(line)
+        ? line.trim().replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim()).filter(Boolean).join(" · ")
+        : line
+    )
+    .join("\n");
+
+  // Emphasis and inline code wrap words rather than being words.
+  text = text
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/\*([^*\n]+)\*/g, "$1")
+    .replace(/(^|[\s(])_([^_\n]+)_(?=[\s).,;:!?]|$)/g, "$1$2")
+    .replace(/`([^`\n]+)`/g, "$1");
+
+  // Collapse the blank runs the stripping leaves behind.
+  return text.replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 /**
