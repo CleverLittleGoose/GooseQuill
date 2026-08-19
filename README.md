@@ -43,7 +43,14 @@ Built for dense statutory financial statements, balance sheets, legal filings, t
 | `gemini-2.5-flash` | Gemini 2.5 Flash | $0.30 / $2.50 | $0.150 / $1.25 | Hybrid reasoning with thinking budget |
 | `gemini-2.5-flash-lite` | Gemini 2.5 Flash-Lite | $0.10 / $0.40 | $0.050 / $0.20 | Ultra-low cost legacy scaling |
 
-*Note: For the latest official pricing tiers and limits, see [Google AI Pricing Documentation](https://ai.google.dev/gemini-api/docs/pricing).*
+*The rates above are the ones bundled with this release, correct at the time of
+writing. They are a snapshot, and Google changes them — nothing in this file
+updates itself. GooseQuill does not read its prices from here: the app costs
+every estimate against its own registry, which **Settings → Sync Rates** refreshes
+from Google, and the **Economics** view shows the live figures along with when they
+were last checked. Treat that card, or
+[Google's pricing page](https://ai.google.dev/gemini-api/docs/pricing), as
+authoritative — not this table.*
 
 ---
 

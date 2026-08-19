@@ -58,6 +58,7 @@ export async function fetchDocuments() {
     appState.presets = data.presets;
     appState.defaultPrompt = data.default_prompt;
     appState.pricing = data.pricing || {};
+    appState.defaultModel = data.default_model || appState.defaultModel || appState.model;
     appState.stats = data.stats || {};
 
     await fetchConsolidatedDocuments();

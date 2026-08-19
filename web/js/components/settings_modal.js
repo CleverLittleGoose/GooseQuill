@@ -6,6 +6,79 @@ import { appState, eventBus } from "../state.js";
 import { showToast } from "../services/notifications.js";
 import { apiClient } from "../services/api_client.js";
 import { testApiConnection } from "./header.js";
+import { money } from "../format.js";
+
+/**
+ * Which generation a model belongs to: "gemini-3.1-flash-lite" → 3.
+ *
+ * `null` for anything that is not a numbered Gemini, so it gets its own
+ * heading rather than being dropped off the list.
+ */
+function generationOf(key) {
+  const match = /^gemini-(\d+)/.exec(String(key));
+  return match ? Number(match[1]) : null;
+}
+
+/**
+ * What one model reads as in the dropdown.
+ *
+ * The rates come from the registry rather than the markup, which is the whole
+ * point: these used to be typed into the `<option>` labels, where a sync could
+ * not reach them and the spec card below could contradict them.
+ *
+ * Exported for testing.
+ */
+export function modelOptionLabel(key, model, defaultModel) {
+  const spec = model || {};
+  const name = spec.name || key;
+  const note = spec.recommended_for || spec.tier || "";
+
+  // The registry's own note for the default model usually says so already
+  // ("Default / Recommended — …"), and marking it again would read
+  // "Default — $0.25 in / $1.50 out · Default / Recommended — …".
+  const marker = key === defaultModel && !/\bdefault\b/i.test(note) ? "Default — " : "";
+
+  const rates = `${money(spec.input_standard)} in / ${money(spec.output_standard)} out`;
+  return note ? `${name} (${marker}${rates} · ${note})` : `${name} (${marker}${rates})`;
+}
+
+/**
+ * The registry, arranged into the optgroups the dropdown draws.
+ *
+ * Newest generation first, models in the order the registry lists them — which
+ * is the default first and then by rising cost. A generation nobody has heard
+ * of yet groups itself, so a model added upstream needs no change here.
+ *
+ * Exported for testing.
+ */
+export function groupModelsForSelect(pricing, defaultModel) {
+  const entries = Object.entries(pricing || {});
+  if (entries.length === 0) return [];
+
+  const byGeneration = new Map();
+  for (const [key, model] of entries) {
+    const generation = generationOf(key);
+    if (!byGeneration.has(generation)) byGeneration.set(generation, []);
+    byGeneration.get(generation).push({
+      value: key,
+      label: modelOptionLabel(key, model, defaultModel)
+    });
+  }
+
+  const generations = [...byGeneration.keys()].sort((a, b) => {
+    // Unnumbered models go last rather than sorting as generation zero.
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return b - a;
+  });
+
+  return generations.map((generation, index) => ({
+    label: generation === null
+      ? "Other Models"
+      : `Gemini ${generation}.x Models${index === 0 ? " (Latest Generation)" : ""}`,
+    models: byGeneration.get(generation)
+  }));
+}
 
 export function initSettingsModal() {
   const settingsModal = document.getElementById("settingsModal");
@@ -27,7 +100,6 @@ export function initSettingsModal() {
 
   function updateModelSpecs(modelKey) {
     const key = modelKey || (modelSelect ? modelSelect.value : appState.model);
-    const pricingData = appState.pricing && appState.pricing[key];
 
     const specModelName = document.getElementById("specModelName");
     const specModelTier = document.getElementById("specModelTier");
@@ -39,23 +111,74 @@ export function initSettingsModal() {
     const specCacheRate = document.getElementById("specCacheRate");
     const specModelRec = document.getElementById("specModelRec");
 
-    if (pricingData) {
-      if (specModelName) specModelName.textContent = pricingData.name || key;
-      if (specModelTier) specModelTier.textContent = pricingData.tier || (key.includes("pro") ? "Pro" : (key.includes("3.7") ? "Frontier" : "Economy"));
-      if (specModelContext) specModelContext.textContent = `Context: ${pricingData.context_window || "1M tokens"}`;
-      if (specModelDesc) specModelDesc.textContent = pricingData.description || "High-performance multimodal model for PDF OCR and document extraction.";
-      if (specStdInput) specStdInput.textContent = `$${pricingData.input_standard.toFixed(2)} / 1M`;
-      if (specStdOutput) specStdOutput.textContent = `$${pricingData.output_standard.toFixed(2)} / 1M`;
-      if (specBatchRate) specBatchRate.textContent = `$${pricingData.input_batch.toFixed(3)} / $${pricingData.output_batch.toFixed(3)} (50% Off)`;
-      if (specCacheRate) specCacheRate.textContent = `$${pricingData.context_cache.toFixed(3)} / 1M`;
-      if (specModelRec) specModelRec.textContent = pricingData.recommended_for || "Statutory filings, OCR document parsing, and markdown generation.";
+    // Empty for a model the registry has no entry for. Leaving the previous
+    // model's figures on screen under this model's name is the one thing this
+    // card must not do, so it goes blank instead — and `money` prints the same
+    // dash for a rate that came back missing.
+    const spec = (appState.pricing && appState.pricing[key]) || {};
+
+    if (specModelName) specModelName.textContent = spec.name || key || "—";
+    if (specModelTier) specModelTier.textContent = spec.tier || "—";
+    if (specModelContext) specModelContext.textContent = `Context: ${spec.context_window || "—"}`;
+    if (specModelDesc) specModelDesc.textContent = spec.description || "";
+    if (specStdInput) specStdInput.textContent = `${money(spec.input_standard)} / 1M`;
+    if (specStdOutput) specStdOutput.textContent = `${money(spec.output_standard)} / 1M`;
+    if (specBatchRate) specBatchRate.textContent = `${money(spec.input_batch)} / ${money(spec.output_batch)} (50% Off)`;
+    if (specCacheRate) specCacheRate.textContent = `${money(spec.context_cache)} / 1M`;
+    if (specModelRec) specModelRec.textContent = spec.recommended_for || "";
+  }
+
+  /**
+   * Rebuild the model dropdown from the registry we currently hold.
+   *
+   * Called every time the modal opens, and again after a sync, so the labels
+   * are the same figures the estimates are costed against — and a model the
+   * registry gains appears without anyone editing the markup.
+   */
+  function populateModelOptions(preferred) {
+    if (!modelSelect) return;
+
+    const previous = modelSelect.value;
+    const groups = groupModelsForSelect(appState.pricing, appState.defaultModel || appState.model);
+
+    modelSelect.innerHTML = "";
+
+    if (groups.length === 0) {
+      // The rates never arrived. An empty dropdown would leave nothing to pick
+      // and nothing to save, so keep the model we are actually running with
+      // and say its price is unknown rather than print one we do not have.
+      const fallback = document.createElement("option");
+      fallback.value = appState.model;
+      fallback.textContent = `${appState.model} (rates unavailable)`;
+      modelSelect.appendChild(fallback);
+      modelSelect.value = appState.model;
+      return;
     }
+
+    for (const group of groups) {
+      const optgroup = document.createElement("optgroup");
+      optgroup.label = group.label;
+      for (const model of group.models) {
+        const option = document.createElement("option");
+        option.value = model.value;
+        option.textContent = model.label;
+        optgroup.appendChild(option);
+      }
+      modelSelect.appendChild(optgroup);
+    }
+
+    // Assigning a value no option carries silently blanks a `<select>`, and the
+    // save handler would then store an empty model. Only restore a choice that
+    // survived the rebuild.
+    const has = (value) => value && groups.some((g) => g.models.some((m) => m.value === value));
+    const wanted = [preferred, previous, appState.model, appState.defaultModel].find(has);
+    if (wanted) modelSelect.value = wanted;
   }
 
   function openSettings() {
     if (modelSelect) {
-      modelSelect.value = appState.model;
-      updateModelSpecs(appState.model);
+      populateModelOptions(appState.model);
+      updateModelSpecs(modelSelect.value);
     }
     if (concurrencySelect) concurrencySelect.value = appState.concurrency || 5;
     if (forceReprocessCheckbox) forceReprocessCheckbox.checked = appState.forceReprocess;
@@ -102,7 +225,7 @@ export function initSettingsModal() {
   if (saveSettingsBtn) {
     saveSettingsBtn.addEventListener("click", async () => {
       const oldModel = appState.model;
-      if (modelSelect) appState.model = modelSelect.value;
+      if (modelSelect && modelSelect.value) appState.model = modelSelect.value;
       if (concurrencySelect) appState.concurrency = parseInt(concurrencySelect.value, 10);
       if (forceReprocessCheckbox) appState.forceReprocess = forceReprocessCheckbox.checked;
       if (systemPromptTextarea) appState.systemPrompt = systemPromptTextarea.value;
@@ -146,6 +269,10 @@ export function initSettingsModal() {
           // so a successful sync has to move it — otherwise the card still says
           // "never synced" over figures that have this moment been fetched.
           appState.pricingSyncedAt = res.synced_at || null;
+          // The option labels carry the rates as well, so they have to be
+          // rebuilt — otherwise the dropdown still quotes the prices the sync
+          // has just replaced, and disagrees with the card below it.
+          populateModelOptions();
           updateModelSpecs(modelSelect ? modelSelect.value : appState.model);
           // The Economics rate card is drawn from this same registry, so it has
           // to be redrawn — otherwise the sync reports success over a table
@@ -200,7 +327,10 @@ export function initSettingsModal() {
     });
   }
 
-  // Initial update of specs card
+  // The rates arrive after this runs, so this first pass usually draws the
+  // "rates unavailable" fallback; opening the modal rebuilds it from whatever
+  // has landed by then.
+  populateModelOptions(appState.model);
   updateModelSpecs(appState.model);
 }
 

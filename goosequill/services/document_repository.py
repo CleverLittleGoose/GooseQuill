@@ -160,6 +160,10 @@ class DocumentRepository:
             "presets": {k: v.to_dict() for k, v in PROMPT_PRESETS.items()},
             "default_prompt": DEFAULT_SYSTEM_PROMPT,
             "pricing": PricingRegistry.get_all_raw(),
+            # Which model the registry treats as the default, so the settings
+            # dropdown can mark it from the first paint rather than waiting for
+            # someone to open the Economics view and fetch it separately.
+            "default_model": PricingRegistry.DEFAULT_MODEL,
             "stats": {
                 "est_input_tokens": aggregate_costs.input_tokens,
                 "est_output_tokens": aggregate_costs.output_tokens,
