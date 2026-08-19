@@ -163,16 +163,25 @@ input[type="checkbox"]:focus-visible {
   gap: 12px;
 }
 
+/* Parchment, not the app's blue: the feather is drawn in a navy close enough to
+   the dark chrome that the mark loses its own outline against it. On a light
+   tile the mark carries at 24px and up. Both stops are the drawing's own
+   colours, so the tile and the thing on it cannot drift apart. */
 .brand-icon {
   width: 38px;
   height: 38px;
   border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  background: linear-gradient(135deg, #faefd0, #e5c77c);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  box-shadow: 0 2px 10px var(--primary-glow);
+  box-shadow: 0 2px 10px var(--accent-amber-glow);
+}
+
+.brand-mark {
+  width: 28px;
+  height: 28px;
+  display: block;
 }
 
 .brand-title {

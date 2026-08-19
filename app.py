@@ -101,8 +101,13 @@ async def add_no_cache_header(request, call_next):
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
-    svg_favicon = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📄</text></svg>"""
-    return Response(content=svg_favicon, media_type="image/svg+xml")
+    # The head alone, not the whole quill: at 16px the feather is a smudge,
+    # while the head still reads. Browsers ask for this path whatever the
+    # document says, so it is served here as well as linked in the page.
+    mark = WEB_DIR / "brand" / "goosequill-head.svg"
+    if mark.is_file():
+        return FileResponse(mark, media_type="image/svg+xml")
+    return Response(status_code=404)
 
 @app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)
 def chrome_devtools_probe():
