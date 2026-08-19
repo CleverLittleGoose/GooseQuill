@@ -54,6 +54,25 @@ test("rates that have never been synced say so, and say what they are instead", 
   assert.equal(stamp.stale, true, "unchecked figures are exactly the ones to flag");
 });
 
+test("never-synced rates name the release they were bundled with", () => {
+  // "The rates bundled with this release" only helps if the reader can find
+  // out which release that was. This is the sentence that tells them.
+  const stamp = syncStampText(null, NOW, "1.0.0");
+  assert.equal(stamp.text, "Never synced — showing the rates bundled with GooseQuill 1.0.0");
+  assert.match(stamp.title, /GooseQuill 1\.0\.0 shipped with/);
+});
+
+test("before the version arrives the line still reads, just vaguer", () => {
+  // The boot payload lands after the first paint, so this is a real state and
+  // not a hypothetical one. It must not read "bundled with GooseQuill ".
+  for (const nothing of ["", null, undefined]) {
+    assert.equal(
+      syncStampText(null, NOW, nothing).text,
+      "Never synced — showing the rates bundled with this release"
+    );
+  }
+});
+
 test("a missing timestamp is treated as never synced, however it arrives", () => {
   for (const nothing of [null, undefined, ""]) {
     assert.match(syncStampText(nothing, NOW).text, /never synced/i);

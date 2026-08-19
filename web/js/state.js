@@ -39,6 +39,10 @@ export const appState = {
   pricingSyncedAt: null,
   // Which model the server treats as the default, so the rate card can mark it.
   defaultModel: "",
+  // Which GooseQuill this is. The rate card says the figures are the ones
+  // "bundled with this release", which is only a useful sentence if the reader
+  // can find out which release that was.
+  version: "",
   stats: {},
   // Workspace UI filter states
   currentView: "workspace", // "workspace" | "studio" | "search" | "combiner" | "batches" | "economics"

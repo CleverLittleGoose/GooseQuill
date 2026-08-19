@@ -16,6 +16,7 @@ from fixtures import SAMPLE_MARKDOWN
 from starlette.testclient import TestClient
 import app as app_module
 from app import app
+from goosequill import __version__
 from goosequill.models.pricing import PricingRegistry
 
 class TestApiEndpoints(unittest.TestCase):
@@ -67,6 +68,40 @@ class TestApiEndpoints(unittest.TestCase):
         self.assertIn("est_total_tokens", stats)
         self.assertIn("est_cost_standard_usd", stats)
         self.assertIn("est_cost_batch_usd", stats)
+
+    def test_the_boot_payload_says_which_release_this_is(self):
+        """
+        The rate card tells the reader its figures are "the rates bundled with
+        this release", which is only a useful sentence if the release has a
+        name. The interface reads it from here, at startup, so naming it costs
+        no extra request.
+        """
+        res = self.client.get("/api/documents?model=gemini-3.1-flash-lite")
+        self.assertEqual(res.json().get("version"), __version__)
+
+    def test_the_boot_payload_names_the_default_model(self):
+        """The settings dropdown marks the default, and should not have to wait
+        for someone to open Economics before it can."""
+        res = self.client.get("/api/documents?model=gemini-3.1-flash-lite")
+        self.assertEqual(res.json().get("default_model"), PricingRegistry.DEFAULT_MODEL)
+
+    def test_backend_endpoint_reports_the_version(self):
+        """`curl /api/backend` should answer "what is this install", which
+        includes which GooseQuill it is."""
+        res = self.client.get("/api/backend")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data.get("version"), __version__)
+        # The backend description it already carried must survive the addition.
+        self.assertIn("backend", data)
+
+    def test_the_version_is_a_release_number_we_could_tag(self):
+        """
+        Guards the one thing a hand-edited version string gets wrong: a value
+        that is not a version at all. `1.0.0`, not `1.0.0-dev` or an empty
+        string left behind by a bad edit.
+        """
+        self.assertRegex(__version__, r"^\d+\.\d+\.\d+$")
 
     def test_batch_jobs_endpoint(self):
         """Test /api/batch/jobs returns jobs list."""

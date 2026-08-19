@@ -38,16 +38,20 @@ export function badgeFor(key, tier, defaultModel) {
  * whenever the release was cut reads exactly like one fetched this morning.
  * This is the line that tells them apart.
  *
- * `now` is a parameter so the wording can be tested without waiting.
+ * `now` is a parameter so the wording can be tested without waiting. `version`
+ * names the release rather than gesturing at it: "the rates bundled with this
+ * release" is only a useful sentence if the reader can find out which release
+ * that was. It falls back to the vaguer wording before the boot payload lands.
  * Exported for testing.
  */
-export function syncStampText(syncedAt, now = Date.now()) {
+export function syncStampText(syncedAt, now = Date.now(), version = "") {
   const STALE_AFTER_DAYS = 30;
+  const release = version ? `GooseQuill ${version}` : "this release";
 
   if (!syncedAt) {
     return {
-      text: "Never synced — showing the rates bundled with this release",
-      title: "These are the figures GooseQuill shipped with. Sync to check them against Google's published rates.",
+      text: `Never synced — showing the rates bundled with ${release}`,
+      title: `These are the figures ${release} shipped with. Sync to check them against Google's published rates.`,
       stale: true
     };
   }
@@ -115,7 +119,7 @@ function renderSyncStamp() {
   const stamp = document.getElementById("rateCardSyncedAt");
   if (!stamp) return;
 
-  const { text, title, stale } = syncStampText(appState.pricingSyncedAt);
+  const { text, title, stale } = syncStampText(appState.pricingSyncedAt, Date.now(), appState.version);
   stamp.textContent = text;
   stamp.title = title;
   stamp.classList.toggle("stale", stale);

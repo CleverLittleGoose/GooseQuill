@@ -1598,6 +1598,21 @@ input[type="checkbox"]:focus-visible {
   background-color: var(--bg-surface-raised);
 }
 
+/* The version, quiet in the corner opposite the save button. `margin-right:
+   auto` is what pushes it there — the footer is otherwise flex-end. */
+.modal-version {
+  margin-right: auto;
+  align-self: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Nothing to say until the boot payload lands; do not hold a gap for it. */
+.modal-version:empty {
+  display: none;
+}
+
 /* Dropzone */
 .dropzone-large {
   border: 2px dashed var(--border-color);

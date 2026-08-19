@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
+from goosequill import __version__
 from goosequill.models import (
     DEFAULT_SYSTEM_PROMPT,
     PROMPT_PRESETS,
@@ -329,13 +330,24 @@ def backend_info() -> Dict[str, Any]:
 
 @app.get("/api/backend")
 def get_backend():
-    """Report which Gemini backend is configured, and whether it is region-pinned."""
-    return backend_info()
+    """Report which Gemini backend is configured, whether it is region-pinned,
+    and which GooseQuill this is.
+
+    The version rides along because this is the endpoint to reach for when
+    someone asks what a given install actually is — answerable with `curl`,
+    without opening the interface.
+    """
+    return {**backend_info(), "version": __version__}
 
 @app.get("/api/documents")
 def get_documents(model: str = "gemini-3.1-flash-lite"):
     """List all discoverable folders and PDF files with page counts and detailed token cost estimates."""
-    return doc_repository.scan_directory(BASE_ACCOUNTS_DIR, model_name=model)
+    payload = doc_repository.scan_directory(BASE_ACCOUNTS_DIR, model_name=model)
+    # Added here rather than in the repository, which scans directories and has
+    # no business knowing the application's version. This is the payload the
+    # interface loads at startup, so carrying it costs no extra request.
+    payload["version"] = __version__
+    return payload
 
 @app.get("/api/pricing")
 def get_pricing():

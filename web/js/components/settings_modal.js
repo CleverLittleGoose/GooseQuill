@@ -175,7 +175,16 @@ export function initSettingsModal() {
     if (wanted) modelSelect.value = wanted;
   }
 
+  /** Name the release in the footer, once the boot payload has said which. */
+  function showVersion() {
+    const el = document.getElementById("settingsVersion");
+    if (!el) return;
+    el.textContent = appState.version ? `GooseQuill ${appState.version}` : "";
+  }
+
   function openSettings() {
+    showVersion();
+
     if (modelSelect) {
       populateModelOptions(appState.model);
       updateModelSpecs(modelSelect.value);
