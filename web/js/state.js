@@ -45,7 +45,7 @@ export const appState = {
   version: "",
   stats: {},
   // Workspace UI filter states
-  currentView: "workspace", // "workspace" | "studio" | "search" | "combiner" | "batches" | "economics"
+  currentView: "workspace", // "workspace" | "studio" | "search" | "combiner" | "deflate" | "batches" | "economics"
   filterStatus: "all",      // "all" | "ready" | "converted" | "batch"
   searchQuery: "",
   folderSearchQuery: "",
@@ -62,6 +62,9 @@ export const appState = {
     // Consolidations contain the documents they were made from, so combining
     // them again duplicates everything. Opt in.
     includeConsolidated: false,
+    // Likewise for deflated copies — except that Deflate turns this on when it
+    // hands a set to the Combiner, which is the one time they are what you want.
+    includeLightweight: false,
     // True while the preview holds an extract rather than the whole document.
     previewIsPartial: false
   }

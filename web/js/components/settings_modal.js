@@ -92,6 +92,7 @@ export function initSettingsModal() {
   const systemPromptTextarea = document.getElementById("systemPromptTextarea");
   const workingDirInput = document.getElementById("workingDirInput");
   const changeWorkingDirBtn = document.getElementById("changeWorkingDirBtn");
+  const browseWorkingDirBtn = document.getElementById("browseWorkingDirBtn");
 
   const settingsSyncPricingBtn = document.getElementById("settingsSyncPricingBtn");
   const settingsSyncSpinner = document.getElementById("settingsSyncSpinner");
@@ -315,23 +316,64 @@ export function initSettingsModal() {
     });
   }
 
-  if (changeWorkingDirBtn) {
-    changeWorkingDirBtn.addEventListener("click", async () => {
-      const newPath = workingDirInput ? workingDirInput.value.trim() : "";
-      if (!newPath) return;
+  /**
+   * Point the workspace at a folder, from wherever the path came from.
+   *
+   * Typing a path and choosing one from Finder end up here together, so the
+   * two routes cannot drift apart on validation, toasts or what gets reloaded.
+   */
+  async function applyWorkingDirectory(newPath) {
+    if (!newPath) return;
+    try {
+      const res = await apiClient.setRootFolder(newPath);
+      if (res && res.status === "success") {
+        appState.rootDirectory = res.root_directory;
+        if (workingDirInput) workingDirInput.value = res.root_directory;
+        showToast("Workspace Switched", `Active directory set to ${res.root_directory}`);
+        eventBus.emit("documents:reload");
+        if (settingsModal) settingsModal.style.display = "none";
+      } else {
+        showToast("Directory Error", (res && res.detail) || "Invalid path", true);
+      }
+    } catch (e) {
+      showToast("Error", e.message, true);
+    }
+  }
 
+  if (changeWorkingDirBtn) {
+    changeWorkingDirBtn.addEventListener("click", () => {
+      applyWorkingDirectory(workingDirInput ? workingDirInput.value.trim() : "");
+    });
+  }
+
+  if (browseWorkingDirBtn) {
+    // Only offered where the host actually has a folder dialog. Asked once,
+    // rather than letting the button fail on a platform that has none.
+    apiClient
+      .folderPickerStatus()
+      .then((status) => {
+        if (status && status.available) browseWorkingDirBtn.style.display = "";
+      })
+      .catch(() => {
+        /* An older server has no such endpoint; the typed path still works. */
+      });
+
+    browseWorkingDirBtn.addEventListener("click", async () => {
+      const startDir = (workingDirInput && workingDirInput.value.trim()) || appState.rootDirectory;
+      // The dialog is modal on the desktop, not in the page, so the button is
+      // disabled meanwhile — otherwise a second click queues a second dialog
+      // behind the first one.
+      browseWorkingDirBtn.disabled = true;
       try {
-        const res = await apiClient.setRootFolder(newPath);
-        if (res && res.status === "success") {
-          appState.rootDirectory = res.root_directory;
-          showToast("Workspace Switched", `Active directory set to ${res.root_directory}`);
-          eventBus.emit("documents:reload");
-          if (settingsModal) settingsModal.style.display = "none";
-        } else {
-          showToast("Directory Error", (res && res.detail) || "Invalid path", true);
+        const res = await apiClient.browseForFolder(startDir);
+        // Cancelling is an ordinary answer, and says to leave things alone.
+        if (res && res.status === "selected" && res.path) {
+          await applyWorkingDirectory(res.path);
         }
       } catch (e) {
-        showToast("Error", e.message, true);
+        showToast("Could Not Open Folder Picker", e.message, true);
+      } finally {
+        browseWorkingDirBtn.disabled = false;
       }
     });
   }

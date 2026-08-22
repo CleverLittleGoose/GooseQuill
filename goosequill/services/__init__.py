@@ -10,6 +10,8 @@ from .batch_service import BatchService
 from .markdown_combiner import MarkdownCombinerService
 from .pricing_sync import PricingSyncService
 from .search_service import SearchService
+from .boilerplate_detector import BoilerplateDetector
+from .folder_picker import choose_folder, is_available as folder_picker_available
 
 __all__ = [
     "PDFRenderer",
@@ -26,5 +28,8 @@ __all__ = [
     "BatchService",
     "MarkdownCombinerService",
     "PricingSyncService",
-    "SearchService"
+    "SearchService",
+    "BoilerplateDetector",
+    "choose_folder",
+    "folder_picker_available",
 ]

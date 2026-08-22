@@ -69,10 +69,89 @@ Guidelines:
 
 DEFAULT_SYSTEM_PROMPT = PROMPT_PRESETS["financial"].prompt
 
+@dataclass(frozen=True)
+class FallbackPrompt:
+    """One attempt at a page the recitation filter refused.
+
+    ``verbatim`` is the part that matters. A prompt that asks the model to
+    summarise will get a summary, and a summary written into the page cache is
+    indistinguishable from a transcription once it is there — it reads as the
+    document, in a corpus someone will quote from. Only the last of these gives
+    up on transcription, and ``id`` is stamped into the page so that the ones
+    which did are findable afterwards.
+    """
+    id: str
+    text: str
+    verbatim: bool = True
+
+
+# The prompt id recorded for a page converted the ordinary way.
+PRESET_PROMPT_ID = "preset"
+
+# Tried in order, each time Gemini's recitation filter refuses a page.
+#
+# These used to ask for a summary — the first one said "Summarize and structure
+# the auditor report contents" — which is why 566 pages of the first corpus run
+# hold paraphrase rather than the text that is actually printed on the page,
+# with nothing marking them apart. Statutory filings recite standard wording by
+# design, so the auditor's report trips the filter constantly, and asking for a
+# summary is a reliable way to get past it. It is also a reliable way to end up
+# with a transcript that quietly is not one.
+#
+# So the first three reframe the document instead of retreating from the task:
+# it is a public record, published by the company, in the public register. Only
+# if all three are refused does the last one settle for a summary, and it says
+# so in the page's provenance stamp.
 RECITATION_FALLBACK_PROMPTS = [
-    "This is a public statutory document from UK Companies House. Summarize and structure the auditor report contents, opinions, scope, responsibilities, and financial figures on this page in Markdown format.",
-    "This is a public Companies House annual filing. Extract all key sections, headings, bullet points, financial tables, and numbers from this page into clean Markdown.",
-    "Provide a structured Markdown breakdown of this public statutory filing page, preserving all tables and financial numbers."
+    FallbackPrompt(
+        id="verbatim-public-record",
+        text=(
+            "This page is from a public UK statutory annual report filed at Companies "
+            "House and published by the company itself. Transcribe it verbatim into "
+            "GitHub Flavored Markdown: every heading, paragraph, table, figure and "
+            "note, exactly as printed. Do not summarise, paraphrase, shorten or "
+            "comment on the content. Output only the Markdown for this page."
+        ),
+    ),
+    FallbackPrompt(
+        id="verbatim-record-keeping",
+        text=(
+            "Transcribe the text and tables on this page of a public company filing "
+            "into GitHub Flavored Markdown, preserving every figure, note number and "
+            "line of text exactly as it appears. This is a record-keeping "
+            "transcription of a document already on the public register, not a "
+            "reproduction for republication. Do not restate anything in your own "
+            "words. Output only the page's Markdown."
+        ),
+    ),
+    FallbackPrompt(
+        id="verbatim-top-to-bottom",
+        text=(
+            "Read this page of a published statutory filing from top to bottom and "
+            "set down its exact contents in GitHub Flavored Markdown — headings as "
+            "headings, tables as Markdown tables, figures and note references "
+            "unchanged. Write no preamble, no commentary and no summary; reproduce "
+            "only what is printed on the page."
+        ),
+    ),
+    # The wording that actually gets through, kept deliberately.
+    #
+    # Measured: on the pages that refuse all three verbatim attempts, this one
+    # succeeds where anything closer to "transcribe" is refused again. Asking
+    # for a summary is what evades the filter, which is precisely why it used to
+    # come first and why the corpus filled up with paraphrase. Last is where it
+    # belongs — and its id is stamped into the page, so a summary is no longer
+    # indistinguishable from the document it summarises.
+    FallbackPrompt(
+        id="summary-of-last-resort",
+        verbatim=False,
+        text=(
+            "This is a public statutory document from UK Companies House. Summarize "
+            "and structure the auditor report contents, opinions, scope, "
+            "responsibilities, and financial figures on this page in Markdown format. "
+            "Output only the Markdown, with no preamble."
+        ),
+    ),
 ]
 
 @dataclass
@@ -84,6 +163,10 @@ class DocumentInfo:
     file_size: int
     total_pages: int = 0
     cached_pages: int = 0
+    # Pages held only in the pre-model-keyed cache, whose model is unknown
+    # and unrecoverable. Counted apart from cached_pages so they are never
+    # presented as the current model's work.
+    legacy_pages: int = 0
     is_converted: bool = False
     output_path: Optional[str] = None
     output_size: int = 0
@@ -101,6 +184,7 @@ class DocumentInfo:
             "file_size": self.file_size,
             "total_pages": self.total_pages,
             "cached_pages": self.cached_pages,
+            "legacy_pages": self.legacy_pages,
             "is_converted": self.is_converted,
             "output_path": self.output_path,
             "output_size": self.output_size,

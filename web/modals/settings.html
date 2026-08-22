@@ -107,6 +107,17 @@
           <label for="workingDirInput">Working Documents Directory</label>
           <div class="input-with-button">
             <input type="text" id="workingDirInput" class="form-input" placeholder="/path/to/Accounts or documents" spellcheck="false">
+            <!--
+              Hidden until the server says this host has a folder dialog to
+              show. A browser cannot report where a folder lives on disk, so
+              the picker is opened by the server on the machine you are sat at.
+            -->
+            <button type="button" class="btn btn-secondary" id="browseWorkingDirBtn" style="display: none;" title="Pick the folder using Finder">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              </svg>
+              Choose Folder
+            </button>
             <button type="button" class="btn btn-secondary" id="changeWorkingDirBtn">Switch Directory</button>
           </div>
           <span class="text-xs text-muted mt-1" style="display: block;">

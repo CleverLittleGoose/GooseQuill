@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional, Callable, Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from ..models.document import DEFAULT_SYSTEM_PROMPT, DocumentInfo
+from ..models.document import DEFAULT_SYSTEM_PROMPT, PRESET_PROMPT_ID, DocumentInfo
 from ..models.job import JobProgress
 from .pdf_renderer import PDFRenderer
 from .cache_manager import CacheManager
@@ -65,24 +65,41 @@ class ConversionEngine:
 
         page_num = page_idx + 1
 
-        if not force_reprocess and self.cache_manager.is_page_cached(pdf_path, page_num):
-            cached_text = self.cache_manager.read_page_cache(pdf_path, page_num)
+        if not force_reprocess and self.cache_manager.is_page_cached(pdf_path, page_num, self.model_name):
+            cached_text = self.cache_manager.read_page_cache(pdf_path, page_num, self.model_name)
             if cached_text is not None:
                 logger.info(f"[{pdf_path.name}] Page {page_num}/{total_pages} loaded from cache")
                 return page_idx, cached_text
 
         logger.info(f"[{pdf_path.name}] OCRing Page {page_num}/{total_pages} via {self.model_name}...")
+        prompt_used = PRESET_PROMPT_ID
+
+        def note_prompt(prompt_id: str) -> None:
+            nonlocal prompt_used
+            prompt_used = prompt_id
+
         try:
             page_text = self.ocr_client.ocr_page_image(
                 img_bytes=img_bytes,
                 status_callback=status_cb,
-                cancel_check=self.is_cancelled
+                cancel_check=self.is_cancelled,
+                prompt_callback=note_prompt
             )
         except Exception as page_err:
             logger.error(f"Error on Page {page_num} of {pdf_path.name}: {page_err}")
-            page_text = f"> **[Note: Page {page_num} OCR encountered an API filter: {str(page_err)}]**"
+            # Deliberately not cached. This note used to be written to the page
+            # file, where it counted as a conversion — the page was the right
+            # size, so every later run skipped it and the hole never healed.
+            # Leaving it uncached is what lets a retry find the page again.
+            return page_idx, f"> **[Note: Page {page_num} could not be converted: {page_err}]**"
 
-        self.cache_manager.write_page_cache(pdf_path, page_num, page_text)
+        # Only recorded when it is not the ordinary preset: the stamp is there
+        # to mark a page that needed special handling, so absence should mean
+        # an unremarkable conversion rather than an unanswered question.
+        self.cache_manager.write_page_cache(
+            pdf_path, page_num, page_text, self.model_name,
+            prompt=None if prompt_used == PRESET_PROMPT_ID else prompt_used
+        )
         return page_idx, page_text
 
     def convert_document(

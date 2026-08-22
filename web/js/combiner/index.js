@@ -48,6 +48,12 @@ function wireSourceControls() {
 
   dom.searchInput()?.addEventListener("input", () => refreshCombinerUI({ resuggest: false, preview: false }));
 
+  dom.byId("studioCombinerIncludeLightweight")?.addEventListener("change", (event) => {
+    appState.combiner.includeLightweight = event.target.checked;
+    applyCombinerSourceFolderFilter();
+    refreshCombinerUI();
+  });
+
   dom.byId("studioCombinerSelectFolderBtn")?.addEventListener("click", () => {
     selectCombinerFolderDocs();
     refreshCombinerUI();
@@ -165,6 +171,9 @@ function adoptSelection(matched) {
  * or neither — and the first two did the same matching work in two copies.
  */
 export async function openCombinerStudio(preselectedPaths = null) {
+  const lightweightToggle = dom.byId("studioCombinerIncludeLightweight");
+  if (lightweightToggle) lightweightToggle.checked = Boolean(appState.combiner.includeLightweight);
+
   await refreshCombinerAvailableFiles();
 
   const incoming = preselectedPaths?.length

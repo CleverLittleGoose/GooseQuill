@@ -1,0 +1,153 @@
+      <div class="studio-view" id="viewDeflate" style="display: none;">
+        <div class="deflate-layout">
+
+          <!-- Left: what to deflate -->
+          <div class="deflate-sidebar">
+            <div class="deflate-sidebar-header">
+              <div class="card-header-flex">
+                <h3 class="studio-pane-title">Documents</h3>
+                <span id="deflateSelectedBadge" class="tab-badge" style="font-size: 13px;">0 Selected</span>
+              </div>
+
+              <div class="search-input-wrapper mt-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="deflateSearchInput" class="search-input" placeholder="Filter by company or filing..." spellcheck="false">
+              </div>
+
+              <div class="combiner-controls-row mt-2">
+                <div class="combiner-quick-actions">
+                  <button class="btn btn-xs btn-secondary" id="deflateSelectAllBtn">Select All</button>
+                  <button class="btn btn-xs btn-secondary" id="deflateSelectVisibleBtn">Select Filtered</button>
+                  <button class="btn btn-xs btn-secondary" id="deflateClearBtn">Clear</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="deflate-file-list" id="deflateFileList">
+              <div class="text-muted text-center" style="padding: 40px;">Loading transcripts...</div>
+            </div>
+          </div>
+
+          <!-- Right: budget, settings, results -->
+          <div class="deflate-main">
+
+            <!-- The question this view exists to answer -->
+            <div class="deflate-budget" id="deflateBudget">
+              <div class="card-header-flex">
+                <h3 class="card-title">Project budget</h3>
+                <select id="deflateBudgetTarget" class="form-select form-select-sm" style="max-width: 260px;">
+                  <option value="2000000">Claude Project with RAG (~2M tokens)</option>
+                  <option value="1000000">Claude Project, in-context (~1M tokens)</option>
+                  <option value="200000">Single chat context (~200K tokens)</option>
+                </select>
+              </div>
+
+              <div class="deflate-budget-figures">
+                <div class="deflate-figure">
+                  <span class="deflate-figure-label">Selected</span>
+                  <strong id="deflateFigureSelected">0 filings</strong>
+                </div>
+                <div class="deflate-figure">
+                  <span class="deflate-figure-label">As transcribed</span>
+                  <strong id="deflateFigureOriginal">—</strong>
+                </div>
+                <div class="deflate-figure">
+                  <span class="deflate-figure-label">After deflating</span>
+                  <strong id="deflateFigureLight" class="text-accent">—</strong>
+                </div>
+                <div class="deflate-figure">
+                  <span class="deflate-figure-label">Of budget</span>
+                  <strong id="deflateFigurePct">—</strong>
+                </div>
+              </div>
+
+              <div class="deflate-meter" id="deflateMeter">
+                <div class="deflate-meter-fill" id="deflateMeterFill" style="width: 0%;"></div>
+                <div class="deflate-meter-saving" id="deflateMeterSaving" style="width: 0%;"></div>
+              </div>
+              <p class="deflate-budget-note" id="deflateBudgetNote">
+                Select filings to price them against a project.
+              </p>
+            </div>
+
+            <!-- How repetition is judged -->
+            <div class="deflate-settings">
+              <div class="card-header-flex">
+                <h3 class="card-title">What counts as boilerplate</h3>
+                <button class="btn btn-xs btn-text-link" id="deflateSettingsToggle">Show settings</button>
+              </div>
+
+              <p class="deflate-explainer">
+                Text is boilerplate when <strong>different companies</strong> say it. A company
+                repeating itself year on year is kept — that is its own standing description,
+                not a statutory form of words.
+              </p>
+
+              <div class="deflate-settings-body" id="deflateSettingsBody" style="display: none;">
+                <div class="deflate-setting-row">
+                  <label class="text-xs text-muted" for="deflateThreshold">
+                    Seen at this many separate companies
+                  </label>
+                  <input type="number" id="deflateThreshold" class="form-input form-input-sm" min="2" max="20" value="3">
+                </div>
+                <div class="deflate-setting-row">
+                  <label class="text-xs text-muted" for="deflatePeerThreshold">
+                    …or this many within one format family
+                  </label>
+                  <input type="number" id="deflatePeerThreshold" class="form-input form-input-sm" min="2" max="20" value="2">
+                </div>
+                <div class="deflate-setting-row">
+                  <label class="text-xs text-muted" for="deflateSimilarity">
+                    Wording must match this closely
+                  </label>
+                  <input type="number" id="deflateSimilarity" class="form-input form-input-sm" min="0.5" max="1" step="0.05" value="0.85">
+                </div>
+                <div class="deflate-setting-row">
+                  <label class="text-xs text-muted" for="deflateMode">Mode</label>
+                  <select id="deflateMode" class="form-select form-select-sm">
+                    <option value="algorithmic">Algorithmic — deterministic, no API calls</option>
+                    <option value="safe">Verified — a model confirms each pattern</option>
+                  </select>
+                </div>
+                <label class="checkbox-pill mt-2" title="Off by default: repetition is measured against the whole workspace, which is what makes it repetition">
+                  <input type="checkbox" id="deflateCompareSelection">
+                  <span>Judge repetition against the selection only</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Run -->
+            <div class="deflate-actions">
+              <button class="btn btn-secondary" id="deflatePreviewBtn">Preview without writing</button>
+              <button class="btn btn-primary" id="deflateRunBtn">Deflate selected</button>
+              <span class="deflate-progress" id="deflateProgress" style="display: none;">
+                <span class="spinner"></span>
+                <span id="deflateProgressText">Scanning…</span>
+              </span>
+            </div>
+
+            <!-- Results -->
+            <div class="deflate-results" id="deflateResults" style="display: none;">
+              <div class="deflate-results-summary" id="deflateResultsSummary"></div>
+
+              <div class="deflate-tabs">
+                <button class="deflate-tab active" data-panel="patterns">Patterns removed</button>
+                <button class="deflate-tab" data-panel="files">Per filing</button>
+                <button class="deflate-tab" data-panel="restated">Restated</button>
+              </div>
+
+              <div class="deflate-panel" id="deflatePanelPatterns"></div>
+              <div class="deflate-panel" id="deflatePanelFiles" style="display: none;"></div>
+              <div class="deflate-panel" id="deflatePanelRestated" style="display: none;"></div>
+
+              <div class="deflate-handoff" id="deflateHandoff" style="display: none;">
+                <button class="btn btn-accent" id="deflateToCombinerBtn">Send lightweight copies to Combine</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>

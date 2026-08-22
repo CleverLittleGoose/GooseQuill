@@ -26,10 +26,19 @@ function extractYear(name) {
  * consolidation alongside the documents it was made from — everything appears
  * twice, and the file grows every time it is rebuilt. Combining consolidations
  * is occasionally what someone wants, so this is a default rather than a rule.
+ *
+ * Lightweight copies are held out on the same terms and for the same reason:
+ * a deflated filing is its transcript with less in it, so a list carrying both
+ * offers the same document twice. Deflate switches this on when it hands a set
+ * over, which is the case where the lightweight copies are the point.
  */
 export function combinableFiles() {
   const all = appState.combiner.availableFiles || [];
-  return appState.combiner.includeConsolidated ? all : all.filter((f) => !f.isConsolidated);
+  return all.filter(
+    (f) =>
+      (appState.combiner.includeConsolidated || !f.isConsolidated) &&
+      (appState.combiner.includeLightweight || !f.isLightweight)
+  );
 }
 
 /** How many documents the source picker is currently offering. */
@@ -68,7 +77,8 @@ export async function refreshCombinerAvailableFiles() {
         size: f.size,
         pages: pages,
         year: year,
-        isConsolidated: Boolean(f.is_consolidated)
+        isConsolidated: Boolean(f.is_consolidated),
+        isLightweight: Boolean(f.is_lightweight)
       };
     });
 

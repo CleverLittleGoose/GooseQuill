@@ -5,6 +5,7 @@ import json
 import hashlib
 import time
 import shutil
+import subprocess
 import threading
 import logging
 from pathlib import Path
@@ -24,6 +25,8 @@ from goosequill.models import (
 )
 
 from goosequill.services.genai_factory import describe_backend
+from goosequill.services.batch_planner import BatchPlanner, DEFAULT_MAX_ENQUEUED_TOKENS
+from goosequill.services import folder_picker
 from goosequill.services import (
     PDFRenderer,
     CacheManager,
@@ -35,9 +38,15 @@ from goosequill.services import (
     BatchService,
     MarkdownCombinerService,
     PricingSyncService,
-    SearchService
+    SearchService,
+    BoilerplateDetector
 )
-from goosequill.services.search_service import CONSOLIDATED_DIR_NAME, is_consolidated
+from goosequill.services.search_service import (
+    CONSOLIDATED_DIR_NAME,
+    LIGHTWEIGHT_DIR_NAME,
+    is_consolidated,
+    is_lightweight,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -166,6 +175,23 @@ search_service = SearchService()
 job_state = JobState()
 active_engine: Optional[ConversionEngine] = None
 
+# Deflation runs on its own state rather than the conversion JobState: it has no
+# pages, no per-file cost, and no cancel, and folding it into the conversion
+# banner would have the workspace report a conversion that is not happening.
+deflate_state: Dict[str, Any] = {
+    "is_running": False,
+    "phase": "",
+    "current_file": "",
+    "files_done": 0,
+    "total_files": 0,
+    "percent": 0.0,
+    "error": None,
+    "results": None,
+    "started_at": None,
+    "finished_at": None,
+}
+deflate_lock = threading.Lock()
+
 # Pydantic Schemas
 class ConvertRequest(BaseModel):
     files: List[str]
@@ -185,6 +211,10 @@ class CreateFolderRequest(BaseModel):
 class SetRootFolderRequest(BaseModel):
     root_path: str
 
+class BrowseFolderRequest(BaseModel):
+    # Where the dialog should open. Optional: falls back to the active workspace.
+    start_dir: Optional[str] = None
+
 class BatchCreateRequest(BaseModel):
     files: List[str]
     model: str = "gemini-3.1-flash-lite"
@@ -193,6 +223,39 @@ class BatchCreateRequest(BaseModel):
 
 class BatchCollectRequest(BaseModel):
     job_id: str
+
+class BatchPlanCreateRequest(BaseModel):
+    """A plan over a whole folder, or over named documents for a repair."""
+    root: Optional[str] = None
+    files: Optional[List[str]] = None
+    model: str = PricingRegistry.DEFAULT_MODEL
+    preset: str = "financial"
+    max_enqueued_tokens: int = DEFAULT_MAX_ENQUEUED_TOKENS
+    force: bool = False
+
+class BatchPlanAdvanceRequest(BaseModel):
+    only: Optional[str] = None
+    max_groups: Optional[int] = None
+    retry_blocked: bool = False
+    retry_failed: bool = False
+
+class DeflateRequest(BaseModel):
+    """A deflation run.
+
+    ``files`` is what gets rewritten. Repetition, though, is a claim about a
+    corpus — so unless ``compare_against_selection`` is set, the whole workspace
+    is read as the reference against which those files are judged. Deflating six
+    filings against only each other would find every shared sentence "repeated
+    throughout the corpus we examined", which is not the same statement at all.
+    """
+    files: List[str]
+    mode: str = "algorithmic"
+    threshold: int = 3
+    peer_threshold: int = 2
+    similarity: float = 0.85
+    model: str = "gemini-2.5-flash-lite"
+    compare_against_selection: bool = False
+    write: bool = True
 
 class CombineMarkdownRequest(BaseModel):
     files: List[str]
@@ -384,6 +447,51 @@ def create_folder(req: CreateFolderRequest):
         return {"status": "created", "name": clean_name, "path": str(new_path)}
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
+
+@app.get("/api/folder_picker")
+def folder_picker_status():
+    """Whether this host can show a native folder dialog.
+
+    Asked once when the interface loads, so the Choose Folder button is only
+    drawn where pressing it could actually do something.
+    """
+    return {"available": folder_picker.is_available(), "platform": sys.platform}
+
+@app.post("/api/browse_folder")
+def browse_folder(req: BrowseFolderRequest):
+    """Open the host's own folder dialog and report what was chosen.
+
+    The browser cannot tell us where a folder lives on disk — no browser will,
+    and rightly so. The server can, because it is running on the same machine
+    as the person using it. See goosequill/services/folder_picker.py.
+
+    Choosing does not switch anything: the path comes back to the interface,
+    which sends it to /api/set_root_folder like any typed path, so validation
+    happens in exactly one place.
+    """
+    start = None
+    if req.start_dir:
+        candidate = Path(req.start_dir).expanduser()
+        if candidate.is_dir():
+            start = candidate
+    if start is None:
+        start = BASE_ACCOUNTS_DIR
+
+    try:
+        chosen = folder_picker.choose_folder(start_dir=start)
+    except folder_picker.PickerUnavailableError as exc:
+        raise HTTPException(status_code=501, detail=str(exc))
+    except subprocess.TimeoutExpired:
+        raise HTTPException(
+            status_code=504,
+            detail="The folder dialog was left open too long and has been closed.",
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    if chosen is None:
+        return {"status": "cancelled"}
+    return {"status": "selected", "path": chosen}
 
 @app.post("/api/set_root_folder")
 def set_root_folder(req: SetRootFolderRequest):
@@ -631,6 +739,145 @@ def collect_batch_results(req: BatchCollectRequest):
         logger.exception("Batch collect error")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# --- Batch plans -----------------------------------------------------------
+#
+# A plan is a corpus-sized conversion split into jobs and submitted as the
+# account's enqueued-token allowance frees up. The plan file on disk is the
+# source of truth, so these endpoints stay thin: create one, read it, and ask
+# it to take a step. A step can take minutes — rendering and uploading a
+# group — so it runs on a thread and the caller polls the plan.
+
+_advancing: Dict[str, bool] = {}
+_advancing_lock = threading.Lock()
+
+
+def _planner() -> BatchPlanner:
+    return BatchPlanner(cache_manager=cache_manager)
+
+
+@app.get("/api/batch/plans")
+def list_batch_plans():
+    """Every saved plan, newest first, with its progress."""
+    try:
+        planner = _planner()
+        with _advancing_lock:
+            running = dict(_advancing)
+        return {"plans": [
+            {
+                **planner.summarise(plan),
+                "advancing": running.get(plan["id"], False),
+                # A plan can also be under way in a terminal, which this process
+                # cannot see in `_advancing` but can see in the lock file.
+                "locked": planner.is_locked(plan["id"]),
+            }
+            for plan in planner.list_plans()
+        ]}
+    except Exception as e:
+        logger.exception("Listing batch plans failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/batch/plans")
+def create_batch_plan(req: BatchPlanCreateRequest):
+    """Group a corpus into jobs. Submits nothing — that is what advance is for."""
+    try:
+        files = None
+        if req.files is not None:
+            files = [str(_resolve_within_root(f)) for f in req.files]
+        root = _resolve_within_root(req.root) if req.root else BASE_ACCOUNTS_DIR.resolve()
+
+        planner = _planner()
+        plan = planner.create_plan(
+            root=root,
+            model=req.model,
+            preset=req.preset,
+            max_enqueued_tokens=req.max_enqueued_tokens,
+            skip_cached=not req.force,
+            files=files,
+        )
+        return {"plan": plan, "summary": planner.summarise(plan)}
+    except HTTPException:
+        raise
+    except (ValueError, KeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Creating a batch plan failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/batch/plans/{plan_id}")
+def get_batch_plan(plan_id: str):
+    """One plan in full, group by group."""
+    _safe_component(plan_id, "Plan ID")
+    try:
+        planner = _planner()
+        plan = planner.load_plan(plan_id)
+        with _advancing_lock:
+            advancing = _advancing.get(plan_id, False)
+        return {
+            # Annotated, so each group can say how many of its pages actually
+            # came back rather than only which state it reached.
+            "plan": planner.annotate(plan),
+            "summary": planner.summarise(plan),
+            "advancing": advancing,
+            "locked": planner.is_locked(plan_id),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.exception("Reading batch plan failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/batch/plans/{plan_id}/advance")
+def advance_batch_plan(plan_id: str, req: BatchPlanAdvanceRequest):
+    """Take one step: collect what has finished, submit what now fits.
+
+    Returns as soon as the step is under way. The plan file records every
+    transition as it happens, so the caller watches progress by re-reading the
+    plan rather than holding a request open for the length of an upload.
+    """
+    _safe_component(plan_id, "Plan ID")
+    planner = _planner()
+    try:
+        planner.load_plan(plan_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    if planner.is_locked(plan_id):
+        # Almost always `batch run --watch` in a terminal. Without this the
+        # step would start, wait thirty seconds for a lock it is not going to
+        # get, and give up somewhere the caller never sees.
+        raise HTTPException(
+            status_code=409,
+            detail="Another process is advancing this plan — most likely `goosequill batch run` in a terminal.",
+        )
+
+    with _advancing_lock:
+        if _advancing.get(plan_id):
+            # Two ticks at once would compete for the same allowance, and the
+            # plan lock would simply block one of them for no benefit.
+            raise HTTPException(status_code=409, detail="This plan is already advancing.")
+        _advancing[plan_id] = True
+
+    def worker():
+        try:
+            if req.retry_blocked:
+                planner.reopen_blocked(plan_id)
+            if req.retry_failed:
+                planner.reopen_failed(plan_id)
+            planner.advance(plan_id, only=req.only, max_new=req.max_groups)
+        except Exception:
+            logger.exception("Advancing plan %s failed", plan_id)
+        finally:
+            with _advancing_lock:
+                _advancing.pop(plan_id, None)
+
+    threading.Thread(target=worker, daemon=True).start()
+    return {"status": "advancing", "plan_id": plan_id}
+
+
 @app.get("/api/search")
 def search_documents(
     q: str,
@@ -758,6 +1005,238 @@ def combine_markdown(req: CombineMarkdownRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ==============================================================================
+# DEFLATE
+# ==============================================================================
+
+def _summarise_deflate(results: Dict[str, Any]) -> Dict[str, Any]:
+    """The parts of a deflation result the browser has any use for.
+
+    The raw result carries the whole fingerprint library — tens of thousands of
+    normalised sections and their word sets. That is the working memory of the
+    scan, not an answer, and it must not be serialised across the wire.
+    """
+    scan = results.get("scan", {})
+    fingerprints = scan.get("fingerprints", {})
+    threshold = results.get("threshold", 2)
+    peer_threshold = results.get("peer_threshold", 2)
+
+    patterns = []
+    for fp in fingerprints.values():
+        if not BoilerplateDetector._is_boilerplate(fp, threshold, peer_threshold):
+            continue
+        patterns.append({
+            "heading": fp.get("heading") or "(untitled)",
+            "companies": len(fp.get("entities", ())),
+            "filings": len(fp.get("files", ())),
+            "words": fp.get("word_count", 0),
+            "verdict": fp.get("llm_verdict"),
+            "example": (fp.get("raw_example") or "")[:400],
+        })
+    patterns.sort(key=lambda p: (p["companies"], p["filings"]), reverse=True)
+
+    restatements: Dict[str, int] = {}
+    for fr in results.get("file_results", []):
+        for r in fr.get("removals", []):
+            if r.get("reason") == "restatement":
+                restatements[r["heading"]] = restatements.get(r["heading"], 0) + 1
+
+    return {
+        "mode": results.get("mode"),
+        "threshold": threshold,
+        "peer_threshold": peer_threshold,
+        "entities_scanned": results.get("entities_scanned", 0),
+        "files_scanned": results.get("files_scanned", 0),
+        "files_deflated": results.get("files_deflated", 0),
+        "total_original_bytes": results.get("total_original_bytes", 0),
+        "total_lightweight_bytes": results.get("total_lightweight_bytes", 0),
+        "total_reduction_pct": results.get("total_reduction_pct", 0.0),
+        "est_tokens_saved": results.get("est_tokens_saved", 0),
+        "corpus_too_small": results.get("corpus_too_small", False),
+        "verification": results.get("verification"),
+        "patterns": patterns[:200],
+        "pattern_count": len(patterns),
+        "restatements": [
+            {"heading": h, "copies": c}
+            for h, c in sorted(restatements.items(), key=lambda x: -x[1])
+        ],
+        "files": [
+            {
+                "source": fr["source"],
+                "name": Path(fr["source"]).name,
+                "entity": BoilerplateDetector.entity_for(Path(fr["source"])),
+                "output": fr["output"],
+                "original_size": fr["original_size"],
+                "lightweight_size": fr["lightweight_size"],
+                "reduction_pct": fr["reduction_pct"],
+                "sections_removed": len(fr.get("sections_removed", [])),
+                "written": fr.get("written", False),
+            }
+            for fr in results.get("file_results", [])
+        ],
+    }
+
+
+def run_deflate_task(req: DeflateRequest, targets: List[Path], references: List[Path]):
+    """Scan the reference corpus, then rewrite the selected files."""
+    global deflate_state
+    try:
+        def on_progress(info):
+            with deflate_lock:
+                deflate_state["phase"] = "deflating"
+                deflate_state["current_file"] = info.get("current_file", "")
+                deflate_state["files_done"] = info.get("current_index", 0)
+                deflate_state["total_files"] = info.get("total_files", 0)
+                total = info.get("total_files", 0) or 1
+                deflate_state["percent"] = round(100.0 * info.get("current_index", 0) / total, 1)
+
+        with deflate_lock:
+            deflate_state["phase"] = "scanning"
+
+        results = BoilerplateDetector.deflate_files(
+            file_paths=targets,
+            reference_paths=references,
+            root_dir=BASE_ACCOUNTS_DIR,
+            mode=req.mode if req.write else "dry-run",
+            threshold=req.threshold,
+            peer_threshold=req.peer_threshold,
+            similarity=req.similarity,
+            model=req.model,
+            progress_callback=on_progress,
+        )
+
+        report_path = None
+        if req.write and req.mode != "dry-run":
+            report_path = str(BoilerplateDetector.save_report(
+                BASE_ACCOUNTS_DIR, BoilerplateDetector.generate_report(results)
+            ))
+
+        summary = _summarise_deflate(results)
+        summary["report_path"] = report_path
+
+        with deflate_lock:
+            deflate_state["results"] = summary
+            deflate_state["error"] = None
+    except Exception as e:
+        logger.exception("Deflation failed")
+        with deflate_lock:
+            deflate_state["error"] = str(e)
+            deflate_state["results"] = None
+    finally:
+        with deflate_lock:
+            deflate_state["is_running"] = False
+            deflate_state["phase"] = "done"
+            deflate_state["percent"] = 100.0
+            deflate_state["finished_at"] = time.time()
+
+
+@app.post("/api/deflate")
+def start_deflate(req: DeflateRequest):
+    """Begin a deflation run in the background."""
+    global deflate_state
+
+    with deflate_lock:
+        if deflate_state["is_running"]:
+            raise HTTPException(status_code=409, detail="A deflation is already running.")
+
+    if not req.files:
+        raise HTTPException(status_code=400, detail="No documents selected to deflate.")
+
+    targets: List[Path] = []
+    for raw in req.files:
+        path = _resolve_within_root(raw)
+        if is_consolidated(path) or is_lightweight(path):
+            # Both are copies of transcripts already in the workspace. Deflating
+            # one produces a lightweight copy of a copy.
+            continue
+        if path.suffix.lower() != ".md" or not path.is_file():
+            continue
+        targets.append(path)
+
+    if not targets:
+        raise HTTPException(
+            status_code=400,
+            detail="None of the selected files are transcripts that can be deflated."
+        )
+
+    if req.compare_against_selection:
+        references = list(targets)
+    else:
+        references = [
+            Path(info["path"])
+            for info in doc_repository.get_converted_markdowns(BASE_ACCOUNTS_DIR)
+            if not info.get("is_consolidated")
+            and not is_lightweight(Path(info["path"]))
+            and "Markdown" in Path(info["path"]).parts
+            and not Path(info["path"]).name.endswith("_Index.md")
+        ]
+
+    with deflate_lock:
+        deflate_state.update({
+            "is_running": True,
+            "phase": "scanning",
+            "current_file": "",
+            "files_done": 0,
+            "total_files": len(targets),
+            "percent": 0.0,
+            "error": None,
+            "results": None,
+            "started_at": time.time(),
+            "finished_at": None,
+        })
+
+    threading.Thread(
+        target=run_deflate_task, args=(req, targets, references), daemon=True
+    ).start()
+
+    return {
+        "status": "started",
+        "targets": len(targets),
+        "references": len(references),
+    }
+
+
+@app.get("/api/deflate/status")
+def get_deflate_status():
+    """Poll the running (or last finished) deflation."""
+    with deflate_lock:
+        return dict(deflate_state)
+
+
+@app.get("/api/deflate/candidates")
+def get_deflate_candidates():
+    """Every transcript that can be deflated, with what it currently costs.
+
+    Sizes are here so the interface can price a selection before running
+    anything: the question this view exists to answer is whether a set of
+    filings will fit somewhere, and that has to be answerable up front.
+    """
+    files = []
+    for info in doc_repository.get_converted_markdowns(BASE_ACCOUNTS_DIR):
+        path = Path(info["path"])
+        if info.get("is_consolidated") or is_lightweight(path):
+            continue
+        # Only actual transcripts. Loose Markdown at the workspace root — notes,
+        # extracts, a previous run's report — is not a filing of anything, and
+        # offering it here invites a "company" called Accounts.
+        if "Markdown" not in path.parts or path.name.endswith("_Index.md"):
+            continue
+        entity = BoilerplateDetector.entity_for(path)
+        lightweight = path.parent.parent / LIGHTWEIGHT_DIR_NAME / path.name
+        files.append({
+            "path": info["path"],
+            "name": info.get("name") or path.name,
+            "stem": info.get("stem") or path.stem,
+            "entity": entity,
+            "peer_group": BoilerplateDetector.peer_group_for(entity),
+            "size": info.get("size", 0),
+            "deflated_size": lightweight.stat().st_size if lightweight.is_file() else None,
+            "deflated_path": str(lightweight) if lightweight.is_file() else None,
+        })
+    files.sort(key=lambda f: (f["entity"].lower(), f["name"].lower()))
+    return {"files": files}
+
+
+# ==============================================================================
 # THE PAGE
 # ==============================================================================
 #
@@ -839,6 +1318,11 @@ if __name__ == "__main__":
     # inside the documents folder, so it must not be reachable from the network.
     # Override only if you understand that exposure (e.g. behind your own auth proxy).
     host = os.environ.get("GOOSEQUILL_HOST", "127.0.0.1")
+    # Deliberately not falling back to $PORT. It is the most collided-on
+    # variable there is — Rails, Node, Heroku, direnv all set it — and this app
+    # binds loopback and is started by hand, so honouring a stray one would
+    # only mean binding somewhere the person running it did not expect, and
+    # somewhere launch.sh is not looking. GOOSEQUILL_PORT is the way to move it.
     port = int(os.environ.get("GOOSEQUILL_PORT", "8000"))
     reload_enabled = os.environ.get("GOOSEQUILL_RELOAD", "0") == "1"
 

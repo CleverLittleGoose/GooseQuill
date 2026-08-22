@@ -16,10 +16,25 @@ _SNIPPET_RADIUS = 70
 # in it is a hit you have already been shown somewhere else.
 CONSOLIDATED_DIR_NAME = "Consolidated"
 
+# Where deflated (boilerplate-stripped) output lives. A lightweight file is a
+# strict subset of the original transcript — every word in it came from the
+# source — so searching it would report the same passage twice, once with the
+# surrounding boilerplate and once without.
+LIGHTWEIGHT_DIR_NAME = "Lightweight"
+
+# The deflation report. It describes a run over the workspace rather than being
+# a document in it, so the listings that offer documents leave it out by name.
+DEFLATE_REPORT_NAME = "_deflate_report.md"
+
 
 def is_consolidated(path: Path) -> bool:
     """Whether a Markdown file is combiner output rather than a transcript."""
     return CONSOLIDATED_DIR_NAME in Path(path).parts
+
+
+def is_lightweight(path: Path) -> bool:
+    """Whether a Markdown file is deflated output rather than a transcript."""
+    return LIGHTWEIGHT_DIR_NAME in Path(path).parts
 
 
 class SearchService:
@@ -43,10 +58,9 @@ class SearchService:
     def iter_markdown_files(root_dir: Path, include_consolidated: bool = False) -> List[Path]:
         """Every converted Markdown document beneath a workspace root.
 
-        Consolidated output is left out by default: its contents are a copy of
-        documents already being searched, so including it reports the same
-        passage two or three times over and pushes the originals down the
-        ranking beneath the file that quotes them all.
+        Consolidated and lightweight output is left out by default: both are
+        derived from original transcripts, so including them reports the same
+        passage multiple times over and pushes the originals down the ranking.
         """
         root = Path(root_dir)
         if not root.exists():
@@ -54,7 +68,9 @@ class SearchService:
         return sorted(
             p
             for p in root.rglob("*.md")
-            if p.is_file() and (include_consolidated or not is_consolidated(p))
+            if p.is_file()
+            and (include_consolidated or not is_consolidated(p))
+            and not is_lightweight(p)
         )
 
     def _load(self, path: Path) -> Optional[Tuple[str, List[int], List[int]]]:

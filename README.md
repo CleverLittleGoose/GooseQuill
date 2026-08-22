@@ -19,12 +19,100 @@ Built for dense statutory financial statements, balance sheets, legal filings, t
   - Compare two filings side by side, with change highlighting across years of the same entity — over the Markdown as written, or over the words it renders to.
   - Workspace-wide search across every converted document, showing the page each match sits on.
   - Markdown Consolidation & Combiner Studio with live preview, smart chronological/alphabetical sorting, Table of Contents generation, and instant export.
+  - Deflate: boilerplate removal that prices a selection against a Claude Project before you build it.
+  - Choose the working documents folder from your own Finder/Explorer dialog, opened by the local server since no browser will report a folder's path.
   - Keyboard-driven: `Cmd/Ctrl+K` to open a document, `?` for the full list.
   - Rich Model Picker with live specification & rate cards (Standard, Batch 50% off, Context caching).
   - Customizable OCR prompts and presets (Financial Statements, Dense Tables, General Documents).
   - Asynchronous Batch API jobs with 50% discount.
 - **Object-Oriented Architecture**: Modular `goosequill` Python package with typed dataclasses, single-responsibility services, and decoupled testing.
-- **Standalone CLI Tools**: `cli.py convert`, `cli.py combine` and `cli.py serve`, plus the simpler `convert_reports_to_markdown.py` and `combine_markdown.py` scripts.
+- **Standalone CLI Tools**: `cli.py convert`, `cli.py combine`, `cli.py deflate` and `cli.py serve`, plus the simpler `convert_reports_to_markdown.py` and `combine_markdown.py` scripts.
+
+---
+
+## Deflate — getting a corpus into a Claude Project
+
+Statutory accounts are mostly the same words. The audit report, the directors'
+responsibilities statement, the accounting policies: every company prints them,
+and in a workspace of a few hundred filings you are paying for the same
+paragraph a hundred times over. Deflate finds the repeated text and replaces
+each copy after the first with a pointer to the one that stays.
+
+It only ever deletes. Every word in a lightweight file came from the transcript
+it was made from — nothing is generated, paraphrased or summarised.
+
+### What makes something boilerplate
+
+Repetition **across companies**, not across filings. A passage is boilerplate
+when several separate entities print it; a company repeating itself year on
+year is keeping its own standing description, which is the opposite of
+boilerplate and is left alone.
+
+Two ways to qualify:
+
+- seen at **three or more separate companies** anywhere in the workspace; or
+- seen at **two or more companies inside one format family** — companies whose
+  names share a leading word, which is how a group's subsidiaries are usually
+  filed — where the filings are drafted off a shared template and word their
+  statutory notes the same way. Different families word the same note
+  differently and never match each other, so the corpus-wide count alone misses
+  a stack's own template text.
+
+### What is never removed
+
+Primary financial statements; anything with a table in it; going concern,
+material uncertainty, qualified opinions, key audit matters; related parties,
+subsidiaries, controlling party and ultimate parent notes; board appointments
+and resignations; and any passage carrying a monetary figure the surviving copy
+does not contain.
+
+That last rule matters more than it looks. Fingerprinting masks amounts and
+dates so that structurally identical prose matches whatever the numbers in it —
+which is exactly how a sentence reporting a figure unique to one filing could
+be mistaken for one that says nothing. Nothing carrying a new number is
+removed.
+
+### A caveat worth stating plainly
+
+The protected-keyword lists are tuned for **UK statutory company accounts** —
+going concern, controlling party, key audit matters, and the rest. On that
+material they are careful. On anything else — technical whitepapers, court
+filings, research papers — they protect nothing in particular, and the only
+guards left are the structural ones (tables, short sections, figures the kept
+copy lacks). Run `--mode dry-run` first and read the report before letting it
+write anything over an unfamiliar corpus.
+
+### Modes
+
+| Mode | What it does |
+| :--- | :--- |
+| `algorithmic` | Deterministic, no API calls. The default. |
+| `safe` | As above, then a model confirms each candidate. Removes a section **only** on an explicit verdict — an unreachable classifier means nothing is removed, not that everything is. |
+| `dry-run` | Reports what would happen and writes no files. |
+
+### Where the output goes
+
+Lightweight copies are written to `<Entity>/Lightweight/`, alongside but
+separate from `Markdown/`. They are excluded from search and from the Combiner
+by default, since a deflated filing is its own transcript with less in it and
+offering both means listing the same document twice. The Deflate view switches
+the Combiner over to them when it hands a set across.
+
+```bash
+python cli.py deflate --all --mode dry-run
+```
+
+```bash
+python cli.py deflate --folder "Example Holdings Limited"
+```
+
+### How much smaller
+
+On a 26 MB corpus of 379 filings across 28 companies, around 12% — roughly
+800,000 tokens. Useful, and not magic: most of a set of accounts is tables and
+figures, which is the part you are keeping. If a selection still does not fit,
+the budget meter in the Deflate view says so before you build anything, and the
+answer is a narrower selection rather than a harder squeeze.
 
 ---
 
@@ -169,6 +257,21 @@ skip straight to launching.
 Drop your PDFs into the `documents/` folder — or use the in-app uploader, or
 point the app at any folder on your machine from **Settings → Working Directory**.
 
+That setting has a **Choose Folder** button that opens your own Finder or
+Explorer dialog. It works in a way worth knowing about, because it is not
+something a web page can normally do: browsers deliberately refuse to tell a
+page where a folder sits on disk — `webkitdirectory` hands over the files
+inside it, `showDirectoryPicker()` hands over a handle, and neither is a path.
+GooseQuill gets around this by having the *server* open the dialog, which it
+can do because it is running on the same machine you are sitting at.
+
+The consequence: **the dialog opens wherever the server is running, not
+wherever your browser is.** Run GooseQuill normally and those are the same
+machine, so it behaves as you would expect. Serve it to another machine and the
+dialog would open on the server's screen, out of your reach — so type the path
+into the field instead, which does the same job. The button hides itself on
+hosts with no dialog to show, such as a headless server.
+
 If GooseQuill is already running, `./launch.sh` opens the browser at it rather
 than trying to start a second copy. If something else holds the port, it tells
 you what.
@@ -206,15 +309,16 @@ Run the automated test runner script directly from the project root:
 ./test.sh
 ```
 
-Or activate the virtual environment and run standard `unittest` or `pytest`:
+`test.sh` runs both suites: the Python backend under `unittest`, and the
+frontend modules under Node's built-in test runner. Note that **`pytest` is not
+a dependency of this project and is not installed** — reach for `unittest`.
+
+Or activate the virtual environment and run `unittest` directly:
 ```bash
 source venv/bin/activate
 
 # Standard library unittest
 python -m unittest discover tests
-
-# Pytest (if installed)
-pytest tests
 ```
 
 The suite is hermetic — it makes no network calls, so it runs offline and in CI.

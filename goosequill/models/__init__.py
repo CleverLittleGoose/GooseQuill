@@ -4,6 +4,8 @@ from .document import (
     PROMPT_PRESETS,
     DEFAULT_SYSTEM_PROMPT,
     RECITATION_FALLBACK_PROMPTS,
+    PRESET_PROMPT_ID,
+    FallbackPrompt,
     DocumentInfo,
     FolderInfo
 )
@@ -17,6 +19,8 @@ __all__ = [
     "PROMPT_PRESETS",
     "DEFAULT_SYSTEM_PROMPT",
     "RECITATION_FALLBACK_PROMPTS",
+    "PRESET_PROMPT_ID",
+    "FallbackPrompt",
     "DocumentInfo",
     "FolderInfo",
     "JobProgress",

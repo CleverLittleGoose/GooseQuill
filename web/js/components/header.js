@@ -124,6 +124,7 @@ export function switchStudioView(viewName) {
     studio: document.getElementById("viewStudio"),
     search: document.getElementById("viewSearch"),
     combiner: document.getElementById("viewCombiner"),
+    deflate: document.getElementById("viewDeflate"),
     batches: document.getElementById("viewBatches"),
     economics: document.getElementById("viewEconomics")
   };
@@ -147,6 +148,8 @@ export function switchStudioView(viewName) {
     eventBus.emit("studio:search:activated");
   } else if (viewName === "combiner") {
     eventBus.emit("studio:combiner:activated");
+  } else if (viewName === "deflate") {
+    eventBus.emit("studio:deflate:activated");
   } else if (viewName === "batches") {
     eventBus.emit("studio:batches:activated");
   } else if (viewName === "economics") {
