@@ -2129,6 +2129,16 @@ input[type="checkbox"]:focus-visible {
 
 .input-with-button .form-input {
   flex: 1;
+  /* Long absolute paths must not push the buttons off the row. */
+  min-width: 0;
+}
+
+.input-with-button .btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 /* Page Section Markers */
@@ -3917,4 +3927,641 @@ body.is-resizing-panes .studio-pane {
 .doc-switcher-item.active .doc-switcher-badge {
   color: #fff;
   background: rgba(255, 255, 255, 0.22);
+}
+
+/* ==========================================================================
+   DEFLATE
+   ==========================================================================
+   Two columns: what to deflate on the left, what it will cost on the right.
+   The budget block sits above the settings because it is the question the
+   view exists to answer — the settings are only how you move the number.
+   ========================================================================== */
+
+.deflate-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  gap: 0;
+}
+
+.deflate-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 380px;
+  flex-shrink: 0;
+  min-height: 0;
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-surface);
+}
+
+.deflate-sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.deflate-file-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 8px;
+}
+
+.deflate-entity-group { margin-bottom: 14px; }
+
+.deflate-entity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+  position: sticky;
+  top: -8px;
+  background: var(--bg-surface);
+  z-index: 1;
+}
+
+.deflate-entity-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.deflate-file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 22px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.deflate-file-item:hover { background: var(--bg-surface-hover); }
+.deflate-file-item.selected { background: var(--bg-surface-raised); }
+
+.deflate-file-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deflate-file-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.deflate-done-tag {
+  color: var(--accent-emerald);
+  font-variant-numeric: tabular-nums;
+}
+
+.deflate-main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.deflate-budget,
+.deflate-settings {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+.deflate-budget-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 14px;
+  margin: 14px 0 12px;
+}
+
+.deflate-figure { display: flex; flex-direction: column; gap: 3px; }
+
+.deflate-figure-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.deflate-figure strong {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The bar shows two lengths at once: what the selection would cost after
+   deflating, and — trailing it in a fainter tone — what deflating removes.
+   Seeing the saving as part of the same bar is the point; a single fill would
+   only say whether it fits, not what earned the room. */
+.deflate-meter {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--bg-surface-raised);
+}
+
+.deflate-meter-fill {
+  background: var(--accent-emerald);
+  transition: width 0.2s ease;
+}
+
+.deflate-meter-saving {
+  background: var(--accent-emerald-glow);
+  transition: width 0.2s ease;
+}
+
+.deflate-meter.over .deflate-meter-fill { background: var(--accent-rose); }
+
+.deflate-budget-note {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.deflate-budget-note.ok { color: var(--accent-emerald); }
+.deflate-budget-note.over { color: var(--accent-rose); }
+
+.deflate-explainer {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.deflate-settings-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.deflate-setting-row { display: flex; flex-direction: column; gap: 4px; }
+
+/* The one control that is a statement rather than a value, so it sits on its
+   own line under the numbers instead of being squeezed into the grid beside
+   them. */
+.deflate-settings-body > .checkbox-pill {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.deflate-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.deflate-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.deflate-results {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+.deflate-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 14px 0 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.deflate-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.deflate-tab.active {
+  color: var(--text-main);
+  border-bottom-color: var(--accent-emerald);
+}
+
+.deflate-panel { max-height: 420px; overflow-y: auto; }
+
+.deflate-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.deflate-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 6px 8px;
+  position: sticky;
+  top: 0;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.deflate-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.deflate-table td.num,
+.deflate-table th:not(:first-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.deflate-handoff { margin-top: 14px; }
+
+/* ==========================================================================
+   Batch plans
+
+   A plan card has to answer three questions from across the room: how far it
+   has got, whether anything is wrong, and whether it is moving. Progress is
+   the bar, trouble is the badge colour, and movement is the badge text —
+   because "Running in a terminal" and "Waiting on Google" look identical if
+   you only draw a spinner.
+   ========================================================================== */
+
+.batch-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 22px;
+}
+
+.plan-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 20px 22px;
+}
+
+/* A plan someone is actively driving, so it is not mistaken for a stalled one. */
+.plan-card.busy {
+  border-color: rgba(99, 102, 241, 0.45);
+  box-shadow: 0 0 0 1px var(--accent-night-glow);
+}
+
+.plan-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.plan-card-title {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.plan-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 5px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.plan-id {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  background: var(--bg-surface-raised);
+  border-radius: var(--radius-xs);
+  padding: 2px 7px;
+}
+
+/*
+ * One badge vocabulary for plans and for the groups inside them. They are the
+ * same five states seen at two scales, and giving them two palettes would mean
+ * learning the screen twice.
+ */
+.plan-state {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.plan-state.done {
+  background-color: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.plan-state.running {
+  background-color: rgba(99, 102, 241, 0.22);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.45);
+}
+
+.plan-state.waiting {
+  background-color: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.plan-state.failed {
+  background-color: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.plan-state.idle {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.plan-progress-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-surface-raised);
+  overflow: hidden;
+  margin-top: 16px;
+}
+
+.plan-progress-fill {
+  height: 100%;
+  background: var(--accent-emerald);
+  transition: width 0.3s ease;
+}
+
+.plan-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  margin-top: 14px;
+}
+
+.plan-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plan-figure-label {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.plan-figure strong {
+  font-size: 14.5px;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* Why a disabled button is disabled. Without it the button just looks broken. */
+.plan-action-note {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/*
+ * The rule and the padding belong to the section, and the scrolling belongs to
+ * a box inside it. They were the same element, and a sticky header sticks to
+ * the top of its scroller's *content* box — so 15px of padding held the header
+ * 15px down, with rows sliding through the gap above it.
+ */
+.plan-group-body {
+  margin-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 14px;
+}
+
+.plan-group-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+/*
+ * Separate borders, not collapsed. A collapsed border belongs to the table
+ * rather than to the cell, so it does not travel with a sticky header — it
+ * scrolls away and leaves the header edgeless over moving rows. The header's
+ * own rule is drawn as an inset shadow, which does travel.
+ */
+.plan-group-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+
+.plan-group-table th {
+  text-align: left;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 6px 10px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-surface);
+  box-shadow: inset 0 -1px 0 var(--border-color);
+}
+
+.plan-group-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+}
+
+/* A shortfall, wherever it appears: a figure on the card, or a cell in the table. */
+.plan-figure.short strong,
+.plan-group-table td.short {
+  color: #fbbf24;
+}
+
+.plan-group-table th.num,
+.plan-group-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-group-name {
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.plan-retry-tag {
+  margin-left: 8px;
+  font-size: 11px;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.14);
+  border-radius: var(--radius-xs);
+  padding: 1px 6px;
+}
+
+.plan-group-error {
+  margin-top: 3px;
+  font-size: 12px;
+  color: #fca5a5;
+}
+
+.plan-job-id {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.plan-empty {
+  padding: 48px 24px;
+  text-align: center;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.plan-empty h4 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+.plan-empty p {
+  max-width: 520px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* --- the composer ------------------------------------------------------- */
+
+.plan-composer {
+  margin-top: 22px;
+  padding: 22px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.plan-composer-note {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  max-width: 680px;
+}
+
+.plan-composer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.plan-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.plan-field-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.plan-composer-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.plan-composer-scope {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  /* A workspace path can be long; it must not push the buttons off the row. */
+  overflow-wrap: anywhere;
+}
+
+.plan-composer-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* --- the jobs, folded away ---------------------------------------------- */
+
+.batch-jobs-details {
+  margin-top: 28px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 16px;
+}
+
+.batch-jobs-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 4px 0;
+  list-style: revert;
+}
+
+.batch-jobs-summary:hover {
+  color: var(--text-main);
+}
+
+.batch-jobs-details .batch-jobs-card-list {
+  margin-top: 16px;
+}
+
+/* A count that is not going to improve, so it must not look like progress. */
+.plan-action-warn {
+  font-size: 12.5px;
+  color: #fbbf24;
 }

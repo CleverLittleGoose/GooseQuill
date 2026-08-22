@@ -4,11 +4,19 @@ from ..models.pricing import CostEstimate, PricingRegistry
 class CostCalculator:
     """Accurate token usage & cost estimator for Google Gemini Models."""
 
-    # Page token defaults for 200 DPI PNG financial reports:
-    # - Input: ~258 image tokens (200 DPI PNG) + ~142 prompt tokens = 400 input tokens/page
-    # - Output: ~850 tokens of dense Markdown financial tables and text per page
-    INPUT_TOKENS_PER_PAGE: int = 400
-    OUTPUT_TOKENS_PER_PAGE: int = 850
+    # Page token defaults for a 200 DPI PNG page of a dense financial report.
+    #
+    # Input: Gemini 3 bills an image at a flat rate set by media_resolution,
+    # not by pixel count — 1120 tokens at the default for images, which is
+    # the high tier. The 258 figure quoted here previously is the cost of a
+    # single 768x768 tile, which only applies to images small enough to fit
+    # in one. A full page never is. Add ~142 tokens for the prompt.
+    #
+    # Output: measured across 11,190 converted pages of UK statutory
+    # accounts, which averaged 2,345 characters — about 650 tokens. The
+    # previous 850 was a guess, and an over-estimate.
+    INPUT_TOKENS_PER_PAGE: int = 1262
+    OUTPUT_TOKENS_PER_PAGE: int = 650
 
     @classmethod
     def estimate_tokens(cls, total_pages: int) -> Tuple[int, int, int]:

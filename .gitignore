@@ -32,4 +32,5 @@ Thumbs.db
 # Claude Code / AI assistant working files
 .claude/
 CLAUDE.md
+AGENTS.md
 .mcp.json

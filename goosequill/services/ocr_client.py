@@ -6,7 +6,11 @@ from typing import Optional, Callable, Dict, Any, List
 from dotenv import load_dotenv
 from google import genai
 from .genai_factory import build_client, resolve_api_key
-from ..models.document import DEFAULT_SYSTEM_PROMPT, RECITATION_FALLBACK_PROMPTS
+from ..models.document import (
+    DEFAULT_SYSTEM_PROMPT,
+    PRESET_PROMPT_ID,
+    RECITATION_FALLBACK_PROMPTS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,13 +68,23 @@ class GeminiOCRClient:
         max_retries: int = 4,
         backoff_factor: float = 2.0,
         status_callback: Optional[Callable[[str], None]] = None,
-        cancel_check: Optional[Callable[[], bool]] = None
+        cancel_check: Optional[Callable[[], bool]] = None,
+        prompt_callback: Optional[Callable[[str], None]] = None
     ) -> str:
-        """Submit a single page image to Gemini Interactions API with automated retry and recitation fallback."""
+        """Submit a single page image to Gemini Interactions API with automated retry and recitation fallback.
+
+        ``prompt_callback`` is told the id of the prompt in force whenever it
+        changes, so the caller can record which one produced the page it gets
+        back. A page converted by a recitation fallback is not the same kind of
+        thing as its neighbours, and nothing else can tell them apart.
+        """
         b64_img = base64.b64encode(img_bytes).decode("utf-8")
         last_exception = None
         current_prompt = prompt or self.system_prompt
+        current_prompt_id = PRESET_PROMPT_ID
         fallback_idx = 0
+        if prompt_callback:
+            prompt_callback(current_prompt_id)
 
         for attempt in range(1, max_retries + 1):
             if cancel_check and cancel_check():
@@ -99,7 +113,11 @@ class GeminiOCRClient:
                     logger.info(msg)
                     if status_callback:
                         status_callback(msg)
-                    current_prompt = RECITATION_FALLBACK_PROMPTS[fallback_idx % len(RECITATION_FALLBACK_PROMPTS)]
+                    fallback = RECITATION_FALLBACK_PROMPTS[fallback_idx % len(RECITATION_FALLBACK_PROMPTS)]
+                    current_prompt = fallback.text
+                    current_prompt_id = fallback.id
+                    if prompt_callback:
+                        prompt_callback(current_prompt_id)
                     fallback_idx += 1
                     time.sleep(1.0)
                     continue

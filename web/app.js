@@ -13,7 +13,9 @@ import { initStudio } from "./js/studio/index.js";
 import { initSearchView } from "./js/components/search_view.js";
 import { initEconomicsView } from "./js/components/economics_view.js";
 import { initCombinerModal, refreshCombinerAvailableFiles } from "./js/combiner/index.js";
+import { initDeflateView } from "./js/deflate/index.js";
 import { initBatchModal, fetchBatchJobs } from "./js/components/batch_modal.js";
+import { initBatchPlans, fetchBatchPlans } from "./js/components/batch_plans.js";
 import { initSettingsModal } from "./js/components/settings_modal.js";
 import { initLogsModal } from "./js/components/logs_modal.js";
 import { initNewFolderModal } from "./js/components/new_folder_modal.js";
@@ -109,7 +111,9 @@ async function init() {
   initSearchView();
   initEconomicsView();
   initCombinerModal();
+  initDeflateView();
   initBatchModal();
+  initBatchPlans();
   initSettingsModal();
   initLogsModal();
   initNewFolderModal();
@@ -134,6 +138,7 @@ async function init() {
   testApiConnection(false).catch(() => {});
   checkJobStatus().catch(() => {});
   fetchBatchJobs(false).catch(() => {});
+  fetchBatchPlans().catch(() => {});
 }
 
 window.addEventListener("DOMContentLoaded", init);

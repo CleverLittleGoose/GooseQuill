@@ -63,6 +63,17 @@ class ApiClient {
     });
   }
 
+  async folderPickerStatus() {
+    return this._request("/api/folder_picker");
+  }
+
+  async browseForFolder(startDir) {
+    return this._request("/api/browse_folder", {
+      method: "POST",
+      body: JSON.stringify({ start_dir: startDir || null })
+    });
+  }
+
   async setRootFolder(rootPath) {
     return this._request("/api/set_root_folder", {
       method: "POST",
@@ -150,6 +161,44 @@ class ApiClient {
   async deleteBatchJob(jobId) {
     return this._request(`/api/batch/jobs/${encodeURIComponent(jobId)}`, {
       method: "DELETE"
+    });
+  }
+
+  // Batch Plans
+  //
+  // A plan is the whole corpus broken into jobs and driven a step at a time.
+  // The same plan files are driven by `goosequill batch run`, so these calls
+  // read and write work that may have been started in a terminal.
+
+  async listBatchPlans() {
+    return this._request("/api/batch/plans");
+  }
+
+  async createBatchPlan({ root = null, model, preset = "financial", force = false, maxEnqueuedTokens = null, files = null } = {}) {
+    const body = { model, preset, force };
+    if (root) body.root = root;
+    if (files) body.files = files;
+    if (maxEnqueuedTokens) body.max_enqueued_tokens = maxEnqueuedTokens;
+    return this._request("/api/batch/plans", {
+      method: "POST",
+      body: JSON.stringify(body)
+    });
+  }
+
+  async getBatchPlan(planId) {
+    return this._request(`/api/batch/plans/${encodeURIComponent(planId)}`);
+  }
+
+  /** Take one step. Returns as soon as the step is under way, not when it ends. */
+  async advanceBatchPlan(planId, { only = null, maxGroups = null, retryBlocked = false, retryFailed = false } = {}) {
+    return this._request(`/api/batch/plans/${encodeURIComponent(planId)}/advance`, {
+      method: "POST",
+      body: JSON.stringify({
+        only,
+        max_groups: maxGroups,
+        retry_blocked: retryBlocked,
+        retry_failed: retryFailed
+      })
     });
   }
 }

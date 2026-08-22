@@ -67,6 +67,15 @@ function renderBatchJobsList(jobs) {
   // The list opens in its loading state; whatever we do below settles it.
   listEl.setAttribute("aria-busy", "false");
 
+  // The jobs sit behind a fold now, under the plans that produced most of
+  // them. A count on the fold is what tells you whether opening it is worth it.
+  const countEl = document.getElementById("batchJobsCount");
+  if (countEl) {
+    countEl.textContent = jobs.length
+      ? `${jobs.length} job${jobs.length === 1 ? "" : "s"}`
+      : "none";
+  }
+
   if (jobs.length === 0) {
     listEl.innerHTML = `
       <div style="padding: 60px 20px; text-align: center; background-color: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md);">

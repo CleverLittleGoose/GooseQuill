@@ -13,21 +13,105 @@
               </h2>
               <p class="text-muted mt-1">Submit large document batches to run asynchronously with a <strong>50% token discount</strong>. Jobs complete overnight within 24 hours.</p>
             </div>
-            <button class="btn btn-secondary btn-md" id="refreshBatchJobsStandaloneBtn" title="Check the batch jobs again">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M23 4v6h-6"></path>
-                <path d="M1 20v-6h6"></path>
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-              </svg>
-              Refresh Jobs
-            </button>
-          </div>
-
-          <div class="batch-jobs-card-list" id="batchJobsStandaloneList" aria-busy="true" aria-live="polite">
-            <div class="view-placeholder">
-              <span class="spinner" aria-hidden="true"></span>
-              <p>Checking for active batch jobs…</p>
+            <div class="batch-header-actions">
+              <button class="btn btn-primary btn-md" id="newBatchPlanBtn" title="Break a workspace into jobs and drive them a step at a time">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                New plan
+              </button>
+              <button class="btn btn-secondary btn-md" id="refreshBatchJobsStandaloneBtn" title="Check the plans and jobs again">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M23 4v6h-6"></path>
+                  <path d="M1 20v-6h6"></path>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+                Refresh
+              </button>
             </div>
           </div>
+
+          <!--
+            Making a plan.
+
+            Deliberately not a modal: it is a form you set up once and then
+            watch the result of, and the plans it produces are on the same
+            screen. Creating a plan submits nothing and costs nothing — it
+            works out the grouping and the price, and waits.
+          -->
+          <div class="plan-composer" id="planComposer" style="display: none;">
+            <h3 class="card-title">New plan</h3>
+            <p class="plan-composer-note">
+              A plan breaks a workspace into one job per company, sized to stay inside
+              Google's payload and enqueued-token limits. Nothing is submitted until you
+              start it, and pages already converted by the chosen model are skipped.
+            </p>
+
+            <div class="plan-composer-grid">
+              <label class="plan-field">
+                <span class="plan-field-label">Model</span>
+                <select id="planModelSelect" class="form-select form-select-sm"></select>
+              </label>
+
+              <label class="plan-field">
+                <span class="plan-field-label">Prompt preset</span>
+                <select id="planPresetSelect" class="form-select form-select-sm"></select>
+              </label>
+
+              <label class="plan-field">
+                <span class="plan-field-label">Enqueued token ceiling</span>
+                <select id="planTokenCeiling" class="form-select form-select-sm">
+                  <option value="8000000" selected>8M — Tier 1 (10M limit)</option>
+                  <option value="4000000">4M — leave room for other work</option>
+                  <option value="1500000">1.5M — free tier</option>
+                </select>
+              </label>
+
+              <div class="plan-field">
+                <span class="plan-field-label">Scope</span>
+                <label class="checkbox-pill" title="Off by default: pages this model has already converted cost nothing to skip">
+                  <input type="checkbox" id="planForceCheckbox">
+                  <span>Reconvert pages already done</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="plan-composer-footer">
+              <p class="plan-composer-scope" id="planComposerScope">Whole workspace.</p>
+              <div class="plan-composer-actions">
+                <button class="btn btn-sm btn-secondary" id="cancelPlanComposerBtn">Cancel</button>
+                <button class="btn btn-sm btn-primary" id="createPlanBtn">Work out the plan</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="plan-list" id="batchPlanList" aria-busy="true" aria-live="polite">
+            <div class="view-placeholder">
+              <span class="spinner" aria-hidden="true"></span>
+              <p>Loading plans…</p>
+            </div>
+          </div>
+
+          <!--
+            The jobs themselves, folded away.
+
+            A plan is the thing you drive; these are what it produced. They stay
+            reachable because a job submitted before plans existed — or by hand
+            from the Workspace — appears only here.
+          -->
+          <details class="batch-jobs-details" id="batchJobsDetails">
+            <summary class="batch-jobs-summary">
+              <span>Individual jobs at Google</span>
+              <span class="text-muted text-sm" id="batchJobsCount"></span>
+            </summary>
+
+            <div class="batch-jobs-card-list" id="batchJobsStandaloneList" aria-busy="true" aria-live="polite">
+              <div class="view-placeholder">
+                <span class="spinner" aria-hidden="true"></span>
+                <p>Checking for active batch jobs…</p>
+              </div>
+            </div>
+          </details>
         </div>
       </div>

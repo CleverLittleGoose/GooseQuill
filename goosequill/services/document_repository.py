@@ -6,7 +6,13 @@ from ..models.pricing import CostEstimate, PricingRegistry
 from .pdf_renderer import PDFRenderer
 from .cache_manager import CacheManager
 from .cost_calculator import CostCalculator
-from .search_service import CONSOLIDATED_DIR_NAME, is_consolidated
+from .search_service import (
+    CONSOLIDATED_DIR_NAME,
+    LIGHTWEIGHT_DIR_NAME,
+    DEFLATE_REPORT_NAME,
+    is_consolidated,
+    is_lightweight,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +72,11 @@ class DocumentRepository:
 
         try:
             total_pages = PDFRenderer.get_page_count(p)
-            cached_pages = self.cache_manager.count_cached_pages(p, total_pages)
+            cached_pages = self.cache_manager.count_cached_pages(p, total_pages, model_name)
+            # Pages that exist only from a run predating model-keyed caching.
+            # Surfaced separately so the UI never presents them as this
+            # model's work.
+            legacy_pages = self.cache_manager.count_legacy_only_pages(p, total_pages, model_name)
 
             out_dir = p.parent / "Markdown"
             out_file = out_dir / f"{p.stem}.md"
@@ -87,6 +97,7 @@ class DocumentRepository:
                 file_size=p.stat().st_size,
                 total_pages=total_pages,
                 cached_pages=cached_pages,
+                legacy_pages=legacy_pages,
                 is_converted=converted,
                 output_path=str(out_file) if converted else None,
                 output_size=out_size,
@@ -131,13 +142,14 @@ class DocumentRepository:
 
         # 2. Discover all subdirectories
         for folder in sorted(root.iterdir()):
-            # "Markdown" holds transcripts and "Consolidated" holds combiner
-            # output; neither is an entity, and both would otherwise appear in
+            # "Markdown" holds transcripts, "Consolidated" holds combiner
+            # output, and "Lightweight" holds deflated (boilerplate-stripped)
+            # output; none is an entity, and all would otherwise appear in
             # the sidebar as a folder containing no filings.
             if (
                 folder.is_dir()
                 and not folder.name.startswith(".")
-                and folder.name not in ("Markdown", CONSOLIDATED_DIR_NAME)
+                and folder.name not in ("Markdown", CONSOLIDATED_DIR_NAME, LIGHTWEIGHT_DIR_NAME)
             ):
                 pdf_list = []
                 for pdf_file in sorted(folder.glob("*.pdf")):
@@ -186,8 +198,8 @@ class DocumentRepository:
     def get_converted_markdowns(self, root_dir: Path) -> List[Dict[str, Any]]:
         """Discover all converted markdown files across all folders in a root directory.
 
-        Consolidated output is included but flagged, rather than filtered out
-        here. Combining consolidations is a legitimate thing to want to do
+        Consolidated and lightweight output is included but flagged, rather than
+        filtered out here. Combining consolidations is a legitimate thing to want to do
         occasionally — it is only a poor default, because a consolidation of a
         folder contains every document in that folder, so sweeping it back in
         duplicates the lot and grows the file every time it is rebuilt. The
@@ -199,11 +211,21 @@ class DocumentRepository:
             return results
 
         for item in sorted(root.rglob("*.md")):
-            if item.name.endswith("_Index.md") or item.name.startswith("."):
+            # Indexes and the deflation report describe the workspace; they are
+            # not documents in it, and neither is anything to combine.
+            if (
+                item.name.endswith("_Index.md")
+                or item.name.startswith(".")
+                or item.name == DEFLATE_REPORT_NAME
+            ):
                 continue
             try:
                 rel = item.relative_to(root)
-                if rel.parent.name == "Markdown":
+                # A lightweight copy belongs to the same entity as the
+                # transcript it was made from, and is named for it in the
+                # folder pickers. Without this it arrives as a folder of its
+                # own called "Example Holdings Limited/Lightweight".
+                if rel.parent.name in ("Markdown", LIGHTWEIGHT_DIR_NAME):
                     folder = str(rel.parent.parent) if str(rel.parent.parent) != "." else "General / Root"
                 else:
                     folder = str(rel.parent) if str(rel.parent) != "." else "General / Root"
@@ -217,6 +239,11 @@ class DocumentRepository:
                 "folder": folder,
                 "size": item.stat().st_size,
                 "is_consolidated": is_consolidated(item),
+                # Flagged rather than filtered, on the same terms as
+                # consolidations: a lightweight copy is the same document with
+                # less in it, so offering it beside its original means
+                # "Select All" combines both and says everything twice.
+                "is_lightweight": is_lightweight(item),
             })
         return results
 
